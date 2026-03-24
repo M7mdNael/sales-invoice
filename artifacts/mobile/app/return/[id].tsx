@@ -64,7 +64,7 @@ export default function ReturnDetailScreen() {
           onPress: () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             deleteReturnInvoice(ret.id);
-            router.dismissAll();
+            router.replace("/(tabs)/returns");
           },
         },
       ]

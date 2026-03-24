@@ -72,7 +72,7 @@ export default function InvoiceDetailScreen() {
           onPress: () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             deleteSalesInvoice(invoice.id);
-            router.dismissAll();
+            router.replace("/(tabs)/invoices");
           },
         },
       ]

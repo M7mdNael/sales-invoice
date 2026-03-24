@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
@@ -189,7 +190,10 @@ function CompanyCard({
   onDelete: () => void;
 }) {
   return (
-    <View style={[styles.card, isRTL && styles.cardRTL]}>
+    <Pressable
+      style={({ pressed }) => [styles.card, isRTL && styles.cardRTL, pressed && styles.cardPressed]}
+      onPress={() => router.push(`/companies/${company.id}`)}
+    >
       <View style={styles.cardIcon}>
         <Feather name="briefcase" size={20} color="#7C3AED" />
       </View>
@@ -202,18 +206,19 @@ function CompanyCard({
           {invoiceCount} {invoicesLabel}
         </Text>
       </View>
-      <Pressable style={styles.editBtn} onPress={onEdit}>
+      <Pressable style={styles.editBtn} onPress={(e) => { e.stopPropagation?.(); onEdit(); }}>
         <Feather name="edit-2" size={16} color={C.tint} />
       </Pressable>
-      <Pressable style={styles.deleteBtn} onPress={onDelete}>
+      <Pressable style={styles.deleteBtn} onPress={(e) => { e.stopPropagation?.(); onDelete(); }}>
         <Feather name="trash-2" size={16} color={C.danger} />
       </Pressable>
-    </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.background },
+  cardPressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   card: {
     backgroundColor: C.card, borderRadius: 16, padding: 16,
     flexDirection: "row", alignItems: "center", marginBottom: 10,
