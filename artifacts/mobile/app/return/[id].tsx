@@ -18,7 +18,7 @@ import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
 import { useLang } from "@/context/LanguageContext";
 import { formatCurrency, formatDate } from "@/utils/format";
-import { generateAndShareReturnPDF } from "@/utils/pdf";
+import { generateAndShareReturnPDF, downloadReturnPDF } from "@/utils/pdf";
 
 const C = Colors.light;
 
@@ -27,6 +27,7 @@ export default function ReturnDetailScreen() {
   const { returnInvoices, deleteReturnInvoice } = useApp();
   const { t, isRTL } = useLang();
   const [sharing, setSharing] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const insets = useSafeAreaInsets();
 
   const ret = returnInvoices.find((r) => r.id === id);
@@ -49,6 +50,18 @@ export default function ReturnDetailScreen() {
       Alert.alert(t("error"), t("errorPDF"));
     } finally {
       setSharing(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await downloadReturnPDF(ret);
+    } catch (e) {
+      Alert.alert(t("error"), t("errorPDF"));
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -145,6 +158,16 @@ export default function ReturnDetailScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: bottomPad }]}>
+        <Pressable style={styles.downloadBtn} onPress={handleDownload} disabled={downloading}>
+          {downloading ? (
+            <ActivityIndicator color={C.danger} size="small" />
+          ) : (
+            <>
+              <Feather name="download" size={16} color={C.danger} />
+              <Text style={styles.downloadBtnText}>{t("downloadPDF")}</Text>
+            </>
+          )}
+        </Pressable>
         <Pressable style={styles.shareBtn} onPress={handleShare} disabled={sharing}>
           {sharing ? (
             <ActivityIndicator color="#fff" size="small" />
@@ -224,11 +247,17 @@ const styles = StyleSheet.create({
   grandTotalLabel: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: C.text },
   grandTotalValue: { fontSize: 18, fontFamily: "Inter_700Bold", color: C.danger },
   footer: {
-    paddingHorizontal: 16, paddingTop: 12, backgroundColor: C.backgroundSecondary,
-    borderTopWidth: 1, borderTopColor: C.border,
+    flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingTop: 12,
+    backgroundColor: C.backgroundSecondary, borderTopWidth: 1, borderTopColor: C.border,
   },
+  downloadBtn: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: C.dangerLight, borderRadius: 14, paddingVertical: 14,
+    borderWidth: 1.5, borderColor: C.danger,
+  },
+  downloadBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: C.danger },
   shareBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
     gap: 8, backgroundColor: C.danger, borderRadius: 14, paddingVertical: 14,
   },
   shareBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },

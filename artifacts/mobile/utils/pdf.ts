@@ -236,7 +236,13 @@ function buildReturnHtml(invoice: ReturnInvoice): string {
 
 export async function generateAndShareSalesPDF(invoice: SalesInvoice): Promise<void> {
   if (Platform.OS === "web") {
-    alert("PDF sharing is not supported on web. Please use the mobile app.");
+    const html = buildSalesHtml(invoice);
+    const win = window.open("", "_blank");
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => { win.print(); }, 400);
+    }
     return;
   }
   const html = buildSalesHtml(invoice);
@@ -253,7 +259,13 @@ export async function generateAndShareSalesPDF(invoice: SalesInvoice): Promise<v
 
 export async function generateAndShareReturnPDF(invoice: ReturnInvoice): Promise<void> {
   if (Platform.OS === "web") {
-    alert("PDF sharing is not supported on web. Please use the mobile app.");
+    const html = buildReturnHtml(invoice);
+    const win = window.open("", "_blank");
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => { win.print(); }, 400);
+    }
     return;
   }
   const html = buildReturnHtml(invoice);
@@ -266,4 +278,34 @@ export async function generateAndShareReturnPDF(invoice: ReturnInvoice): Promise
       UTI: "com.adobe.pdf",
     });
   }
+}
+
+export async function downloadSalesPDF(invoice: SalesInvoice): Promise<void> {
+  const html = buildSalesHtml(invoice);
+  if (Platform.OS === "web") {
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${invoice.invoiceNumber}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    return;
+  }
+  await Print.printAsync({ html });
+}
+
+export async function downloadReturnPDF(invoice: ReturnInvoice): Promise<void> {
+  const html = buildReturnHtml(invoice);
+  if (Platform.OS === "web") {
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${invoice.returnNumber}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    return;
+  }
+  await Print.printAsync({ html });
 }

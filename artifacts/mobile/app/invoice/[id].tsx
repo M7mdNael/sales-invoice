@@ -18,7 +18,7 @@ import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
 import { useLang } from "@/context/LanguageContext";
 import { formatCurrency, formatDate } from "@/utils/format";
-import { generateAndShareSalesPDF } from "@/utils/pdf";
+import { generateAndShareSalesPDF, downloadSalesPDF } from "@/utils/pdf";
 
 const C = Colors.light;
 
@@ -27,6 +27,7 @@ export default function InvoiceDetailScreen() {
   const { salesInvoices, deleteSalesInvoice } = useApp();
   const { t, isRTL } = useLang();
   const [sharing, setSharing] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const insets = useSafeAreaInsets();
 
   const invoice = salesInvoices.find((inv) => inv.id === id);
@@ -52,8 +53,20 @@ export default function InvoiceDetailScreen() {
     }
   };
 
+  const handleDownload = async () => {
+    setDownloading(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await downloadSalesPDF(invoice);
+    } catch (e) {
+      Alert.alert(t("error"), t("errorPDF"));
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const handleCreateReturn = () => {
-    router.push({ pathname: "/return/create", params: { companyId: inv.companyId } });
+    router.push({ pathname: "/return/create", params: { companyId: invoice.companyId } });
   };
 
   const handleEdit = () => {
@@ -137,24 +150,38 @@ export default function InvoiceDetailScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: bottomPad }]}>
-        <Pressable style={[styles.editBtn]} onPress={handleEdit}>
-          <Feather name="edit-2" size={16} color={C.tint} />
-          <Text style={styles.editBtnText}>{t("edit")}</Text>
-        </Pressable>
-        <Pressable style={[styles.returnBtn]} onPress={handleCreateReturn}>
-          <Feather name="rotate-ccw" size={16} color={C.danger} />
-          <Text style={styles.returnBtnText}>{t("return")}</Text>
-        </Pressable>
-        <Pressable style={[styles.shareBtn, { flex: 2 }]} onPress={handleShare} disabled={sharing}>
-          {sharing ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <>
-              <Feather name="share" size={16} color="#fff" />
-              <Text style={styles.shareBtnText}>{t("sharePDF")}</Text>
-            </>
-          )}
-        </Pressable>
+        <View style={styles.footerRow}>
+          <Pressable style={styles.editBtn} onPress={handleEdit}>
+            <Feather name="edit-2" size={16} color={C.tint} />
+            <Text style={styles.editBtnText}>{t("edit")}</Text>
+          </Pressable>
+          <Pressable style={styles.returnBtn} onPress={handleCreateReturn}>
+            <Feather name="rotate-ccw" size={16} color={C.danger} />
+            <Text style={styles.returnBtnText}>{t("return")}</Text>
+          </Pressable>
+        </View>
+        <View style={styles.footerRow}>
+          <Pressable style={styles.downloadBtn} onPress={handleDownload} disabled={downloading}>
+            {downloading ? (
+              <ActivityIndicator color={C.tint} size="small" />
+            ) : (
+              <>
+                <Feather name="download" size={16} color={C.tint} />
+                <Text style={styles.downloadBtnText}>{t("downloadPDF")}</Text>
+              </>
+            )}
+          </Pressable>
+          <Pressable style={styles.shareBtn} onPress={handleShare} disabled={sharing}>
+            {sharing ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Feather name="share" size={16} color="#fff" />
+                <Text style={styles.shareBtnText}>{t("sharePDF")}</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -222,9 +249,10 @@ const styles = StyleSheet.create({
   grandTotalLabel: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: C.text },
   grandTotalValue: { fontSize: 18, fontFamily: "Inter_700Bold", color: C.tint },
   footer: {
-    flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingTop: 12,
+    flexDirection: "column", gap: 8, paddingHorizontal: 16, paddingTop: 12,
     backgroundColor: C.backgroundSecondary, borderTopWidth: 1, borderTopColor: C.border,
   },
+  footerRow: { flexDirection: "row", gap: 8 },
   editBtn: {
     flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5,
     backgroundColor: C.tintLight, borderRadius: 14, paddingVertical: 14,
@@ -235,8 +263,14 @@ const styles = StyleSheet.create({
     backgroundColor: C.dangerLight, borderRadius: 14, paddingVertical: 14,
   },
   returnBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: C.danger },
+  downloadBtn: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: C.tintLight, borderRadius: 14, paddingVertical: 14,
+    borderWidth: 1.5, borderColor: C.tint,
+  },
+  downloadBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: C.tint },
   shareBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
     gap: 8, backgroundColor: C.tint, borderRadius: 14, paddingVertical: 14,
   },
   shareBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
