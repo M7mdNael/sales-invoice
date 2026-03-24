@@ -8,6 +8,12 @@ import React, {
   useState,
 } from "react";
 
+export interface Company {
+  id: string;
+  name: string;
+  notes: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -25,6 +31,8 @@ export interface SalesInvoiceItem {
 export interface SalesInvoice {
   id: string;
   invoiceNumber: string;
+  companyId: string;
+  companyName: string;
   customerName: string;
   date: string;
   items: SalesInvoiceItem[];
@@ -44,6 +52,8 @@ export interface ReturnInvoice {
   returnNumber: string;
   originalInvoiceId: string;
   originalInvoiceNumber: string;
+  companyId: string;
+  companyName: string;
   customerName: string;
   date: string;
   items: ReturnItem[];
@@ -51,14 +61,25 @@ export interface ReturnInvoice {
 }
 
 interface AppContextValue {
+  companies: Company[];
   products: Product[];
   salesInvoices: SalesInvoice[];
   returnInvoices: ReturnInvoice[];
   isLoading: boolean;
+  addCompany: (name: string, notes: string) => Company;
+  updateCompany: (id: string, name: string, notes: string) => void;
+  deleteCompany: (id: string) => void;
   addProduct: (name: string, price: number) => void;
   updateProduct: (id: string, name: string, price: number) => void;
   deleteProduct: (id: string) => void;
   addSalesInvoice: (
+    company: Company,
+    customerName: string,
+    items: Omit<SalesInvoiceItem, "id">[]
+  ) => SalesInvoice;
+  updateSalesInvoice: (
+    id: string,
+    company: Company,
     customerName: string,
     items: Omit<SalesInvoiceItem, "id">[]
   ) => SalesInvoice;
@@ -73,6 +94,7 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 const STORAGE_KEYS = {
+  companies: "@invoice_app/companies",
   products: "@invoice_app/products",
   salesInvoices: "@invoice_app/sales_invoices",
   returnInvoices: "@invoice_app/return_invoices",
@@ -84,7 +106,36 @@ function generateId(): string {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
 }
 
+function migrateSalesInvoice(raw: Record<string, unknown>): SalesInvoice {
+  return {
+    id: raw.id as string,
+    invoiceNumber: raw.invoiceNumber as string,
+    companyId: (raw.companyId as string) ?? "",
+    companyName: (raw.companyName as string) ?? (raw.customerName as string) ?? "",
+    customerName: (raw.customerName as string) ?? "",
+    date: raw.date as string,
+    items: (raw.items as SalesInvoiceItem[]) ?? [],
+    total: raw.total as number,
+  };
+}
+
+function migrateReturnInvoice(raw: Record<string, unknown>): ReturnInvoice {
+  return {
+    id: raw.id as string,
+    returnNumber: raw.returnNumber as string,
+    originalInvoiceId: raw.originalInvoiceId as string,
+    originalInvoiceNumber: raw.originalInvoiceNumber as string,
+    companyId: (raw.companyId as string) ?? "",
+    companyName: (raw.companyName as string) ?? (raw.customerName as string) ?? "",
+    customerName: (raw.customerName as string) ?? "",
+    date: raw.date as string,
+    items: (raw.items as ReturnItem[]) ?? [],
+    total: raw.total as number,
+  };
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const [companies, setCompanies] = useState<Company[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [salesInvoices, setSalesInvoices] = useState<SalesInvoice[]>([]);
   const [returnInvoices, setReturnInvoices] = useState<ReturnInvoice[]>([]);
@@ -95,16 +146,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const load = async () => {
       try {
-        const [p, s, r, ic, rc] = await Promise.all([
+        const [c, p, s, r, ic, rc] = await Promise.all([
+          AsyncStorage.getItem(STORAGE_KEYS.companies),
           AsyncStorage.getItem(STORAGE_KEYS.products),
           AsyncStorage.getItem(STORAGE_KEYS.salesInvoices),
           AsyncStorage.getItem(STORAGE_KEYS.returnInvoices),
           AsyncStorage.getItem(STORAGE_KEYS.invoiceCounter),
           AsyncStorage.getItem(STORAGE_KEYS.returnCounter),
         ]);
+        if (c) setCompanies(JSON.parse(c));
         if (p) setProducts(JSON.parse(p));
-        if (s) setSalesInvoices(JSON.parse(s));
-        if (r) setReturnInvoices(JSON.parse(r));
+        if (s) {
+          const parsed = JSON.parse(s);
+          setSalesInvoices(parsed.map(migrateSalesInvoice));
+        }
+        if (r) {
+          const parsed = JSON.parse(r);
+          setReturnInvoices(parsed.map(migrateReturnInvoice));
+        }
         if (ic) setInvoiceCounter(parseInt(ic, 10));
         if (rc) setReturnCounter(parseInt(rc, 10));
       } catch (e) {
@@ -116,23 +175,52 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     load();
   }, []);
 
+  const saveCompanies = useCallback(async (data: Company[]) => {
+    await AsyncStorage.setItem(STORAGE_KEYS.companies, JSON.stringify(data));
+  }, []);
+
   const saveProducts = useCallback(async (data: Product[]) => {
     await AsyncStorage.setItem(STORAGE_KEYS.products, JSON.stringify(data));
   }, []);
 
   const saveSalesInvoices = useCallback(async (data: SalesInvoice[]) => {
-    await AsyncStorage.setItem(
-      STORAGE_KEYS.salesInvoices,
-      JSON.stringify(data)
-    );
+    await AsyncStorage.setItem(STORAGE_KEYS.salesInvoices, JSON.stringify(data));
   }, []);
 
   const saveReturnInvoices = useCallback(async (data: ReturnInvoice[]) => {
-    await AsyncStorage.setItem(
-      STORAGE_KEYS.returnInvoices,
-      JSON.stringify(data)
-    );
+    await AsyncStorage.setItem(STORAGE_KEYS.returnInvoices, JSON.stringify(data));
   }, []);
+
+  const addCompany = useCallback(
+    (name: string, notes: string): Company => {
+      const company: Company = { id: generateId(), name: name.trim(), notes: notes.trim() };
+      const updated = [...companies, company];
+      setCompanies(updated);
+      saveCompanies(updated);
+      return company;
+    },
+    [companies, saveCompanies]
+  );
+
+  const updateCompany = useCallback(
+    (id: string, name: string, notes: string) => {
+      const updated = companies.map((c) =>
+        c.id === id ? { ...c, name: name.trim(), notes: notes.trim() } : c
+      );
+      setCompanies(updated);
+      saveCompanies(updated);
+    },
+    [companies, saveCompanies]
+  );
+
+  const deleteCompany = useCallback(
+    (id: string) => {
+      const updated = companies.filter((c) => c.id !== id);
+      setCompanies(updated);
+      saveCompanies(updated);
+    },
+    [companies, saveCompanies]
+  );
 
   const addProduct = useCallback(
     (name: string, price: number) => {
@@ -175,12 +263,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [returnCounter]);
 
   const addSalesInvoice = useCallback(
-    (customerName: string, items: Omit<SalesInvoiceItem, "id">[]) => {
+    (company: Company, customerName: string, items: Omit<SalesInvoiceItem, "id">[]) => {
       const next = invoiceCounter + 1;
       const invoice: SalesInvoice = {
         id: generateId(),
         invoiceNumber: `INV-${String(next).padStart(4, "0")}`,
-        customerName,
+        companyId: company.id,
+        companyName: company.name,
+        customerName: customerName.trim(),
         date: new Date().toISOString(),
         items: items.map((item) => ({ ...item, id: generateId() })),
         total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
@@ -195,6 +285,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [invoiceCounter, salesInvoices, saveSalesInvoices]
   );
 
+  const updateSalesInvoice = useCallback(
+    (id: string, company: Company, customerName: string, items: Omit<SalesInvoiceItem, "id">[]) => {
+      const existing = salesInvoices.find((inv) => inv.id === id);
+      if (!existing) throw new Error("Invoice not found");
+      const updated_invoice: SalesInvoice = {
+        ...existing,
+        companyId: company.id,
+        companyName: company.name,
+        customerName: customerName.trim(),
+        items: items.map((item) => ({ ...item, id: generateId() })),
+        total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+      };
+      const updated = salesInvoices.map((inv) =>
+        inv.id === id ? updated_invoice : inv
+      );
+      setSalesInvoices(updated);
+      saveSalesInvoices(updated);
+      return updated_invoice;
+    },
+    [salesInvoices, saveSalesInvoices]
+  );
+
   const addReturnInvoice = useCallback(
     (originalInvoice: SalesInvoice, items: Omit<ReturnItem, "id">[]) => {
       const next = returnCounter + 1;
@@ -203,6 +315,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         returnNumber: `RET-${String(next).padStart(4, "0")}`,
         originalInvoiceId: originalInvoice.id,
         originalInvoiceNumber: originalInvoice.invoiceNumber,
+        companyId: originalInvoice.companyId,
+        companyName: originalInvoice.companyName,
         customerName: originalInvoice.customerName,
         date: new Date().toISOString(),
         items: items.map((item) => ({ ...item, id: generateId() })),
@@ -220,27 +334,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(
     () => ({
+      companies,
       products,
       salesInvoices,
       returnInvoices,
       isLoading,
+      addCompany,
+      updateCompany,
+      deleteCompany,
       addProduct,
       updateProduct,
       deleteProduct,
       addSalesInvoice,
+      updateSalesInvoice,
       addReturnInvoice,
       getNextInvoiceNumber,
       getNextReturnNumber,
     }),
     [
+      companies,
       products,
       salesInvoices,
       returnInvoices,
       isLoading,
+      addCompany,
+      updateCompany,
+      deleteCompany,
       addProduct,
       updateProduct,
       deleteProduct,
       addSalesInvoice,
+      updateSalesInvoice,
       addReturnInvoice,
       getNextInvoiceNumber,
       getNextReturnNumber,

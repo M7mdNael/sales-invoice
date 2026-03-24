@@ -30,6 +30,10 @@ function buildSalesHtml(invoice: SalesInvoice): string {
     )
     .join("");
 
+  const companySection = invoice.companyName
+    ? `<div class="meta-item"><label>Company</label><p>${invoice.companyName}</p></div>`
+    : "";
+
   return `
     <!DOCTYPE html>
     <html>
@@ -37,67 +41,85 @@ function buildSalesHtml(invoice: SalesInvoice): string {
       <meta charset="utf-8"/>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #111; padding: 40px; }
-        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
-        .company { font-size: 24px; font-weight: 700; color: #1A73E8; }
-        .invoice-label { font-size: 28px; font-weight: 700; color: #111; }
-        .invoice-number { font-size: 16px; color: #666; margin-top: 4px; }
-        .meta { display: flex; gap: 40px; margin-bottom: 32px; background: #F8FAFC; padding: 20px; border-radius: 8px; }
-        .meta-item label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
-        .meta-item p { font-size: 15px; font-weight: 600; margin-top: 4px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-        thead tr { background: #1A73E8; color: white; }
-        thead th { padding: 12px 16px; text-align: left; font-size: 13px; font-weight: 600; }
+        body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #111; padding: 40px; background: #fff; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 2px solid #1A73E8; }
+        .brand { display: flex; flex-direction: column; gap: 4px; }
+        .brand-name { font-size: 13px; font-weight: 600; color: #1A73E8; text-transform: uppercase; letter-spacing: 1px; }
+        .invoice-type { font-size: 28px; font-weight: 700; color: #111; }
+        .invoice-meta { text-align: right; }
+        .invoice-number { font-size: 20px; font-weight: 700; color: #1A73E8; }
+        .invoice-date { font-size: 14px; color: #666; margin-top: 4px; }
+        .info-grid { display: flex; gap: 24px; margin-bottom: 32px; background: #F8FAFC; padding: 20px 24px; border-radius: 12px; border-left: 4px solid #1A73E8; }
+        .info-item { flex: 1; }
+        .info-item label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; display: block; margin-bottom: 4px; }
+        .info-item p { font-size: 15px; font-weight: 600; color: #111; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 0; }
+        .table-wrapper { border-radius: 12px; overflow: hidden; border: 1px solid #E5E7EB; margin-bottom: 24px; }
+        thead tr { background: #1A73E8; }
+        thead th { padding: 13px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
         thead th:not(:first-child) { text-align: right; }
-        tbody tr { border-bottom: 1px solid #F3F4F6; }
-        tbody td { padding: 12px 16px; font-size: 14px; }
-        .total-row { background: #F8FAFC; }
-        .total-row td { font-weight: 700; font-size: 16px; padding: 16px; }
-        .footer { margin-top: 48px; text-align: center; font-size: 12px; color: #999; }
+        tbody tr:nth-child(even) { background: #F8FAFC; }
+        tbody tr:nth-child(odd) { background: #fff; }
+        tbody td { padding: 12px 16px; font-size: 14px; color: #333; border-bottom: 1px solid #F3F4F6; }
+        .total-section { display: flex; justify-content: flex-end; margin-bottom: 32px; }
+        .total-box { background: #1A73E8; color: white; padding: 16px 24px; border-radius: 12px; display: flex; gap: 40px; align-items: center; }
+        .total-label { font-size: 13px; font-weight: 600; opacity: 0.85; }
+        .total-value { font-size: 22px; font-weight: 700; }
+        .footer { text-align: center; font-size: 13px; color: #999; padding-top: 24px; border-top: 1px solid #E5E7EB; }
       </style>
     </head>
     <body>
       <div class="header">
-        <div>
-          <div class="company">Sales Invoice</div>
+        <div class="brand">
+          <div class="brand-name">Sales Invoice</div>
+          <div class="invoice-type">${invoice.companyName || "Invoice"}</div>
         </div>
-        <div style="text-align:right">
-          <div class="invoice-label">${invoice.invoiceNumber}</div>
-          <div class="invoice-number">${formatDate(invoice.date)}</div>
+        <div class="invoice-meta">
+          <div class="invoice-number">${invoice.invoiceNumber}</div>
+          <div class="invoice-date">${formatDate(invoice.date)}</div>
         </div>
       </div>
-      <div class="meta">
-        <div class="meta-item">
+
+      <div class="info-grid">
+        ${companySection}
+        <div class="info-item">
           <label>Customer</label>
-          <p>${invoice.customerName}</p>
+          <p>${invoice.customerName || "—"}</p>
         </div>
-        <div class="meta-item">
+        <div class="info-item">
           <label>Invoice Date</label>
           <p>${formatDate(invoice.date)}</p>
         </div>
-        <div class="meta-item">
+        <div class="info-item">
           <label>Currency</label>
           <p>Jordanian Dinar (JOD)</p>
         </div>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Product</th>
-            <th style="text-align:center">Qty</th>
-            <th style="text-align:right">Unit Price</th>
-            <th style="text-align:right">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${itemRows}
-          <tr class="total-row">
-            <td colspan="3" style="text-align:right">Grand Total</td>
-            <td style="text-align:right">${formatCurrency(invoice.total)}</td>
-          </tr>
-        </tbody>
-      </table>
-      <div class="footer">Thank you for your business</div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th style="text-align:right">Qty</th>
+              <th style="text-align:right">Unit Price</th>
+              <th style="text-align:right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemRows}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="total-section">
+        <div class="total-box">
+          <div class="total-label">Grand Total</div>
+          <div class="total-value">${formatCurrency(invoice.total)}</div>
+        </div>
+      </div>
+
+      <div class="footer">Thank you for your business &bull; ${invoice.invoiceNumber}</div>
     </body>
     </html>
   `;
@@ -109,13 +131,17 @@ function buildReturnHtml(invoice: ReturnInvoice): string {
       (item) => `
     <tr>
       <td>${item.productName}</td>
-      <td style="text-align:center">${item.quantity}</td>
+      <td style="text-align:right">${item.quantity}</td>
       <td style="text-align:right">${formatCurrency(item.price)}</td>
       <td style="text-align:right">${formatCurrency(item.price * item.quantity)}</td>
     </tr>
   `
     )
     .join("");
+
+  const companySection = invoice.companyName
+    ? `<div class="info-item"><label>Company</label><p>${invoice.companyName}</p></div>`
+    : "";
 
   return `
     <!DOCTYPE html>
@@ -124,76 +150,91 @@ function buildReturnHtml(invoice: ReturnInvoice): string {
       <meta charset="utf-8"/>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #111; padding: 40px; }
-        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
-        .company { font-size: 24px; font-weight: 700; color: #EA4335; }
-        .invoice-label { font-size: 28px; font-weight: 700; color: #111; }
-        .invoice-number { font-size: 16px; color: #666; margin-top: 4px; }
-        .meta { display: flex; gap: 40px; margin-bottom: 32px; background: #FEF3CD; padding: 20px; border-radius: 8px; }
-        .meta-item label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
-        .meta-item p { font-size: 15px; font-weight: 600; margin-top: 4px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-        thead tr { background: #EA4335; color: white; }
-        thead th { padding: 12px 16px; text-align: left; font-size: 13px; font-weight: 600; }
+        body { font-family: -apple-system, Helvetica, Arial, sans-serif; color: #111; padding: 40px; background: #fff; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 2px solid #EA4335; }
+        .brand { display: flex; flex-direction: column; gap: 4px; }
+        .brand-name { font-size: 13px; font-weight: 600; color: #EA4335; text-transform: uppercase; letter-spacing: 1px; }
+        .invoice-type { font-size: 28px; font-weight: 700; color: #111; }
+        .invoice-meta { text-align: right; }
+        .invoice-number { font-size: 20px; font-weight: 700; color: #EA4335; }
+        .invoice-date { font-size: 14px; color: #666; margin-top: 4px; }
+        .info-grid { display: flex; gap: 24px; margin-bottom: 32px; background: #FFF9F9; padding: 20px 24px; border-radius: 12px; border-left: 4px solid #EA4335; }
+        .info-item { flex: 1; }
+        .info-item label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; display: block; margin-bottom: 4px; }
+        .info-item p { font-size: 15px; font-weight: 600; color: #111; }
+        table { width: 100%; border-collapse: collapse; }
+        .table-wrapper { border-radius: 12px; overflow: hidden; border: 1px solid #E5E7EB; margin-bottom: 24px; }
+        thead tr { background: #EA4335; }
+        thead th { padding: 13px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
         thead th:not(:first-child) { text-align: right; }
-        tbody tr { border-bottom: 1px solid #F3F4F6; }
-        tbody td { padding: 12px 16px; font-size: 14px; }
-        .total-row { background: #FCE8E6; }
-        .total-row td { font-weight: 700; font-size: 16px; padding: 16px; color: #EA4335; }
-        .ref { font-size: 13px; color: #666; margin-bottom: 24px; }
-        .footer { margin-top: 48px; text-align: center; font-size: 12px; color: #999; }
+        tbody tr:nth-child(even) { background: #FFF9F9; }
+        tbody tr:nth-child(odd) { background: #fff; }
+        tbody td { padding: 12px 16px; font-size: 14px; color: #333; border-bottom: 1px solid #F3F4F6; }
+        .total-section { display: flex; justify-content: flex-end; margin-bottom: 32px; }
+        .total-box { background: #EA4335; color: white; padding: 16px 24px; border-radius: 12px; display: flex; gap: 40px; align-items: center; }
+        .total-label { font-size: 13px; font-weight: 600; opacity: 0.85; }
+        .total-value { font-size: 22px; font-weight: 700; }
+        .footer { text-align: center; font-size: 13px; color: #999; padding-top: 24px; border-top: 1px solid #E5E7EB; }
       </style>
     </head>
     <body>
       <div class="header">
-        <div>
-          <div class="company">Return Invoice</div>
+        <div class="brand">
+          <div class="brand-name">Return Invoice</div>
+          <div class="invoice-type">${invoice.companyName || "Return"}</div>
         </div>
-        <div style="text-align:right">
-          <div class="invoice-label">${invoice.returnNumber}</div>
-          <div class="invoice-number">${formatDate(invoice.date)}</div>
+        <div class="invoice-meta">
+          <div class="invoice-number">${invoice.returnNumber}</div>
+          <div class="invoice-date">${formatDate(invoice.date)}</div>
         </div>
       </div>
-      <div class="meta">
-        <div class="meta-item">
+
+      <div class="info-grid">
+        ${companySection}
+        <div class="info-item">
           <label>Customer</label>
-          <p>${invoice.customerName}</p>
+          <p>${invoice.customerName || "—"}</p>
         </div>
-        <div class="meta-item">
+        <div class="info-item">
           <label>Original Invoice</label>
           <p>${invoice.originalInvoiceNumber}</p>
         </div>
-        <div class="meta-item">
+        <div class="info-item">
           <label>Return Date</label>
           <p>${formatDate(invoice.date)}</p>
         </div>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Product</th>
-            <th style="text-align:center">Qty Returned</th>
-            <th style="text-align:right">Unit Price</th>
-            <th style="text-align:right">Refund</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${itemRows}
-          <tr class="total-row">
-            <td colspan="3" style="text-align:right">Total Refund</td>
-            <td style="text-align:right">${formatCurrency(invoice.total)}</td>
-          </tr>
-        </tbody>
-      </table>
-      <div class="footer">Return processed — currency: Jordanian Dinar (JOD)</div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th style="text-align:right">Qty Returned</th>
+              <th style="text-align:right">Unit Price</th>
+              <th style="text-align:right">Refund</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemRows}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="total-section">
+        <div class="total-box">
+          <div class="total-label">Total Refund</div>
+          <div class="total-value">${formatCurrency(invoice.total)}</div>
+        </div>
+      </div>
+
+      <div class="footer">Return processed &bull; ${invoice.returnNumber} &bull; Currency: Jordanian Dinar (JOD)</div>
     </body>
     </html>
   `;
 }
 
-export async function generateAndShareSalesPDF(
-  invoice: SalesInvoice
-): Promise<void> {
+export async function generateAndShareSalesPDF(invoice: SalesInvoice): Promise<void> {
   if (Platform.OS === "web") {
     alert("PDF sharing is not supported on web. Please use the mobile app.");
     return;
@@ -210,9 +251,7 @@ export async function generateAndShareSalesPDF(
   }
 }
 
-export async function generateAndShareReturnPDF(
-  invoice: ReturnInvoice
-): Promise<void> {
+export async function generateAndShareReturnPDF(invoice: ReturnInvoice): Promise<void> {
   if (Platform.OS === "web") {
     alert("PDF sharing is not supported on web. Please use the mobile app.");
     return;

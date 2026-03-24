@@ -1,4 +1,4 @@
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React from "react";
@@ -14,13 +14,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
+import { useLang } from "@/context/LanguageContext";
 import { formatCurrency } from "@/utils/format";
 
 const C = Colors.light;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { salesInvoices, returnInvoices, products } = useApp();
+  const { salesInvoices, returnInvoices, products, companies } = useApp();
+  const { t, isRTL } = useLang();
 
   const totalSales = salesInvoices.reduce((s, inv) => s + inv.total, 0);
   const totalReturns = returnInvoices.reduce((s, inv) => s + inv.total, 0);
@@ -38,88 +40,104 @@ export default function HomeScreen() {
         colors={["#1A73E8", "#0D47A1"]}
         style={[styles.header, { paddingTop: topPad + 20 }]}
       >
-        <Text style={styles.headerLabel}>Sales Manager</Text>
-        <Text style={styles.headerTitle}>{formatCurrency(net)}</Text>
-        <Text style={styles.headerSub}>Net Revenue</Text>
+        <View style={[styles.headerTop, isRTL && styles.headerTopRTL]}>
+          <Text style={styles.headerLabel}>{t("appName")}</Text>
+          <Pressable
+            style={styles.settingsBtn}
+            onPress={() => router.push("/settings/")}
+          >
+            <Feather name="settings" size={20} color="rgba(255,255,255,0.85)" />
+          </Pressable>
+        </View>
+        <Text style={[styles.headerTitle, isRTL && styles.textRTL]}>{formatCurrency(net)}</Text>
+        <Text style={[styles.headerSub, isRTL && styles.textRTL]}>{t("netRevenue")}</Text>
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{salesInvoices.length}</Text>
-            <Text style={styles.statLabel}>Invoices</Text>
+            <Text style={styles.statLabel}>{t("invoices")}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{returnInvoices.length}</Text>
-            <Text style={styles.statLabel}>Returns</Text>
+            <Text style={styles.statLabel}>{t("returns")}</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{companies.length}</Text>
+            <Text style={styles.statLabel}>{t("companies")}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{products.length}</Text>
-            <Text style={styles.statLabel}>Products</Text>
+            <Text style={styles.statLabel}>{t("products")}</Text>
           </View>
         </View>
       </LinearGradient>
 
       <View style={styles.body}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>{t("quickActions")}</Text>
         <View style={styles.actionsGrid}>
           <ActionCard
             icon="plus-circle"
-            label="New Invoice"
+            label={t("newInvoice")}
             color="#1A73E8"
             bg="#E8F0FE"
             onPress={() => router.push("/invoice/create")}
           />
           <ActionCard
             icon="rotate-ccw"
-            label="New Return"
+            label={t("newReturn")}
             color="#EA4335"
             bg="#FCE8E6"
             onPress={() => router.push("/return/create")}
           />
           <ActionCard
+            icon="briefcase"
+            label={t("companies")}
+            color="#7C3AED"
+            bg="#EDE9FE"
+            onPress={() => router.push("/companies/")}
+          />
+          <ActionCard
             icon="package"
-            label="Products"
+            label={t("products")}
             color="#34A853"
             bg="#E6F4EA"
             onPress={() => router.push("/products/")}
           />
-          <ActionCard
-            icon="bar-chart-2"
-            label="Reports"
-            color="#FBBC05"
-            bg="#FEF3CD"
-            onPress={() => router.push("/(tabs)/reports")}
-          />
         </View>
 
-        <Text style={styles.sectionTitle}>Summary</Text>
+        <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>{t("summary")}</Text>
         <View style={styles.summaryCard}>
           <SummaryRow
-            label="Total Sales"
+            label={t("totalSales")}
             value={formatCurrency(totalSales)}
             color={C.success}
+            isRTL={isRTL}
           />
           <View style={styles.divider} />
           <SummaryRow
-            label="Total Returns"
+            label={t("totalReturns")}
             value={formatCurrency(totalReturns)}
             color={C.danger}
+            isRTL={isRTL}
           />
           <View style={styles.divider} />
           <SummaryRow
-            label="Net"
+            label={t("net")}
             value={formatCurrency(net)}
             color={net >= 0 ? C.tint : C.danger}
             bold
+            isRTL={isRTL}
           />
         </View>
 
         {salesInvoices.length > 0 && (
           <>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent Invoices</Text>
+            <View style={[styles.sectionHeader, isRTL && styles.sectionHeaderRTL]}>
+              <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>{t("recentInvoices")}</Text>
               <Pressable onPress={() => router.push("/(tabs)/invoices")}>
-                <Text style={styles.seeAll}>See all</Text>
+                <Text style={styles.seeAll}>{t("seeAll")}</Text>
               </Pressable>
             </View>
             {salesInvoices
@@ -128,19 +146,19 @@ export default function HomeScreen() {
               .map((inv) => (
                 <Pressable
                   key={inv.id}
-                  style={styles.recentItem}
+                  style={[styles.recentItem, isRTL && styles.recentItemRTL]}
                   onPress={() => router.push(`/invoice/${inv.id}`)}
                 >
-                  <View style={styles.recentIcon}>
+                  <View style={[styles.recentIcon, isRTL && styles.recentIconRTL]}>
                     <Feather name="file-text" size={18} color={C.tint} />
                   </View>
                   <View style={styles.recentInfo}>
-                    <Text style={styles.recentNum}>{inv.invoiceNumber}</Text>
-                    <Text style={styles.recentCustomer}>{inv.customerName}</Text>
+                    <Text style={[styles.recentNum, isRTL && styles.textRTL]}>{inv.invoiceNumber}</Text>
+                    <Text style={[styles.recentCustomer, isRTL && styles.textRTL]}>
+                      {inv.companyName || inv.customerName}
+                    </Text>
                   </View>
-                  <Text style={styles.recentAmount}>
-                    {formatCurrency(inv.total)}
-                  </Text>
+                  <Text style={styles.recentAmount}>{formatCurrency(inv.total)}</Text>
                 </Pressable>
               ))}
           </>
@@ -184,15 +202,17 @@ function SummaryRow({
   value,
   color,
   bold,
+  isRTL,
 }: {
   label: string;
   value: string;
   color: string;
   bold?: boolean;
+  isRTL?: boolean;
 }) {
   return (
-    <View style={styles.summaryRow}>
-      <Text style={[styles.summaryLabel, bold && styles.summaryLabelBold]}>
+    <View style={[styles.summaryRow, isRTL && styles.summaryRowRTL]}>
+      <Text style={[styles.summaryLabel, bold && styles.summaryLabelBold, isRTL && styles.textRTL]}>
         {label}
       </Text>
       <Text style={[styles.summaryValue, { color }, bold && styles.summaryValueBold]}>
@@ -211,12 +231,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 32,
   },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  headerTopRTL: {
+    flexDirection: "row-reverse",
+  },
+  settingsBtn: {
+    padding: 4,
+  },
   headerLabel: {
     fontSize: 13,
     fontFamily: "Inter_500Medium",
     color: "rgba(255,255,255,0.7)",
     letterSpacing: 0.5,
-    marginBottom: 8,
   },
   headerTitle: {
     fontSize: 40,
@@ -229,6 +260,9 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.7)",
     marginTop: 2,
     marginBottom: 24,
+  },
+  textRTL: {
+    textAlign: "right",
   },
   statsRow: {
     flexDirection: "row",
@@ -245,12 +279,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)",
   },
   statValue: {
-    fontSize: 22,
+    fontSize: 20,
     fontFamily: "Inter_700Bold",
     color: "#fff",
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Inter_400Regular",
     color: "rgba(255,255,255,0.7)",
     marginTop: 2,
@@ -269,6 +303,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  sectionHeaderRTL: {
+    flexDirection: "row-reverse",
   },
   seeAll: {
     fontSize: 14,
@@ -327,6 +364,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
   },
+  summaryRowRTL: {
+    flexDirection: "row-reverse",
+  },
   summaryLabel: {
     fontSize: 15,
     fontFamily: "Inter_400Regular",
@@ -362,6 +402,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 1,
   },
+  recentItemRTL: {
+    flexDirection: "row-reverse",
+  },
   recentIcon: {
     width: 40,
     height: 40,
@@ -370,6 +413,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
+  },
+  recentIconRTL: {
+    marginRight: 0,
+    marginLeft: 12,
   },
   recentInfo: {
     flex: 1,

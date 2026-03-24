@@ -1,0 +1,323 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { I18nManager } from "react-native";
+
+export type Lang = "en" | "ar";
+
+const translations = {
+  en: {
+    appName: "Sales Manager",
+    home: "Home",
+    invoices: "Invoices",
+    returns: "Returns",
+    reports: "Reports",
+    settings: "Settings",
+    companies: "Companies",
+    products: "Products",
+    netRevenue: "Net Revenue",
+    totalSales: "Total Sales",
+    totalReturns: "Total Returns",
+    net: "Net",
+    quickActions: "Quick Actions",
+    newInvoice: "New Invoice",
+    newReturn: "New Return",
+    summary: "Summary",
+    recentInvoices: "Recent Invoices",
+    seeAll: "See all",
+    noInvoicesYet: "No invoices yet",
+    noReturnsYet: "No returns yet",
+    noCompaniesYet: "No companies yet",
+    noProductsYet: "No products yet",
+    addFirstProduct: "Add First Product",
+    createInvoice: "Create Invoice",
+    createReturn: "Create Return",
+    addCompany: "Add Company",
+    editCompany: "Edit Company",
+    companyName: "Company Name",
+    companyNotes: "Notes (optional)",
+    customerName: "Customer Name",
+    selectCompany: "Select Company",
+    changeCompany: "Change",
+    selectInvoice: "Select Invoice to Return",
+    invoiceNumber: "Invoice Number",
+    returnNumber: "Return Number",
+    originalInvoice: "Original Invoice",
+    date: "Date",
+    currency: "Currency",
+    company: "Company",
+    customer: "Customer",
+    returnDate: "Return Date",
+    invoiceDate: "Invoice Date",
+    items: "Items",
+    returnedItems: "Returned Items",
+    product: "Product",
+    qty: "Qty",
+    qtyReturned: "Qty Returned",
+    unitPrice: "Unit Price",
+    total: "Total",
+    refund: "Refund",
+    grandTotal: "Grand Total",
+    totalRefund: "Total Refund",
+    saveInvoice: "Save Invoice",
+    saveChanges: "Save Changes",
+    createReturnBtn: "Create Return",
+    sharePDF: "Share PDF",
+    return: "Return",
+    completed: "Completed",
+    ref: "Ref",
+    addProduct: "Add Product",
+    editProduct: "Edit Product",
+    productName: "Product Name",
+    price: "Price (JOD)",
+    cancel: "Cancel",
+    update: "Update",
+    delete: "Delete",
+    edit: "Edit",
+    save: "Save",
+    all: "All",
+    filterByCompany: "Filter by Company",
+    noInvoicesForCompany: "No invoices for this company",
+    noReturnsForCompany: "No returns for this company",
+    perCompanyReport: "Per-Company Report",
+    avgInvoice: "Avg. Invoice",
+    totalInvoices: "Total Invoices",
+    totalReturnsCount: "Total Returns",
+    returnRate: "Return Rate",
+    recentActivity: "Recent Activity",
+    financialSummary: "Financial Summary",
+    statistics: "Statistics",
+    language: "Language",
+    english: "English",
+    arabic: "Arabic (عربي)",
+    languageNote: "Changing language will restart the app layout.",
+    addTapToAdd: "Tap to add products",
+    missingInfo: "Missing Info",
+    enterCustomer: "Please enter a customer name.",
+    selectCompanyFirst: "Please select a company.",
+    emptyInvoice: "Empty Invoice",
+    addOneProduct: "Please add at least one product.",
+    noItems: "No Items",
+    enterReturnQty: "Please enter quantities to return.",
+    invalidQuantity: "Invalid Quantity",
+    exceedsLimit: "Exceeds limit",
+    addedProducts: "Add products to start creating invoices",
+    addCompaniesFirst: "Add companies to start creating invoices",
+    maxReturn: "Max return",
+    alreadyReturned: "already returned",
+    soldQty: "Sold",
+    eachPrice: "each",
+    invoiceRef: "Invoice Ref",
+    positiveBalance: "Positive balance",
+    negativeBalance: "Negative balance",
+    thankyou: "Thank you for your business",
+    returnProcessed: "Return processed — currency: Jordanian Dinar (JOD)",
+    jordanianDinar: "Jordanian Dinar (JOD)",
+    errorPDF: "Failed to generate PDF.",
+    error: "Error",
+    deleteProduct: "Delete Product",
+    deleteProductConfirm: "Are you sure you want to delete",
+    deleteCompany: "Delete Company",
+    deleteCompanyConfirm: "Are you sure you want to delete",
+    missingName: "Missing Name",
+    enterProductName: "Please enter a product name.",
+    invalidPrice: "Invalid Price",
+    enterValidPrice: "Please enter a valid price.",
+    missingCompanyName: "Missing Name",
+    enterCompanyName: "Please enter a company name.",
+    editInvoice: "Edit Invoice",
+    noAvailableInvoices: "No invoices available",
+    createSalesFirst: "Create a sales invoice first",
+    items_count: "item",
+    items_count_plural: "items",
+  },
+  ar: {
+    appName: "مدير المبيعات",
+    home: "الرئيسية",
+    invoices: "الفواتير",
+    returns: "المرتجعات",
+    reports: "التقارير",
+    settings: "الإعدادات",
+    companies: "الشركات",
+    products: "المنتجات",
+    netRevenue: "صافي الإيراد",
+    totalSales: "إجمالي المبيعات",
+    totalReturns: "إجمالي المرتجعات",
+    net: "الصافي",
+    quickActions: "إجراءات سريعة",
+    newInvoice: "فاتورة جديدة",
+    newReturn: "مرتجع جديد",
+    summary: "ملخص",
+    recentInvoices: "الفواتير الأخيرة",
+    seeAll: "عرض الكل",
+    noInvoicesYet: "لا توجد فواتير بعد",
+    noReturnsYet: "لا توجد مرتجعات بعد",
+    noCompaniesYet: "لا توجد شركات بعد",
+    noProductsYet: "لا توجد منتجات بعد",
+    addFirstProduct: "أضف أول منتج",
+    createInvoice: "إنشاء فاتورة",
+    createReturn: "إنشاء مرتجع",
+    addCompany: "إضافة شركة",
+    editCompany: "تعديل الشركة",
+    companyName: "اسم الشركة",
+    companyNotes: "ملاحظات (اختياري)",
+    customerName: "اسم العميل",
+    selectCompany: "اختر شركة",
+    changeCompany: "تغيير",
+    selectInvoice: "اختر فاتورة للمرتجع",
+    invoiceNumber: "رقم الفاتورة",
+    returnNumber: "رقم المرتجع",
+    originalInvoice: "الفاتورة الأصلية",
+    date: "التاريخ",
+    currency: "العملة",
+    company: "الشركة",
+    customer: "العميل",
+    returnDate: "تاريخ المرتجع",
+    invoiceDate: "تاريخ الفاتورة",
+    items: "البنود",
+    returnedItems: "البنود المرتجعة",
+    product: "المنتج",
+    qty: "الكمية",
+    qtyReturned: "الكمية المرتجعة",
+    unitPrice: "سعر الوحدة",
+    total: "المجموع",
+    refund: "الاسترداد",
+    grandTotal: "المجموع الكلي",
+    totalRefund: "إجمالي الاسترداد",
+    saveInvoice: "حفظ الفاتورة",
+    saveChanges: "حفظ التغييرات",
+    createReturnBtn: "إنشاء مرتجع",
+    sharePDF: "مشاركة PDF",
+    return: "مرتجع",
+    completed: "مكتمل",
+    ref: "مرجع",
+    addProduct: "إضافة منتج",
+    editProduct: "تعديل منتج",
+    productName: "اسم المنتج",
+    price: "السعر (د.أ)",
+    cancel: "إلغاء",
+    update: "تحديث",
+    delete: "حذف",
+    edit: "تعديل",
+    save: "حفظ",
+    all: "الكل",
+    filterByCompany: "تصفية حسب الشركة",
+    noInvoicesForCompany: "لا توجد فواتير لهذه الشركة",
+    noReturnsForCompany: "لا توجد مرتجعات لهذه الشركة",
+    perCompanyReport: "تقرير لكل شركة",
+    avgInvoice: "متوسط الفاتورة",
+    totalInvoices: "إجمالي الفواتير",
+    totalReturnsCount: "إجمالي المرتجعات",
+    returnRate: "معدل الإرجاع",
+    recentActivity: "النشاط الأخير",
+    financialSummary: "الملخص المالي",
+    statistics: "الإحصائيات",
+    language: "اللغة",
+    english: "English",
+    arabic: "العربية",
+    languageNote: "تغيير اللغة سيعيد تشغيل تخطيط التطبيق.",
+    addTapToAdd: "اضغط لإضافة منتجات",
+    missingInfo: "معلومات ناقصة",
+    enterCustomer: "يرجى إدخال اسم العميل.",
+    selectCompanyFirst: "يرجى اختيار شركة.",
+    emptyInvoice: "فاتورة فارغة",
+    addOneProduct: "يرجى إضافة منتج واحد على الأقل.",
+    noItems: "لا توجد بنود",
+    enterReturnQty: "يرجى إدخال الكميات المراد إرجاعها.",
+    invalidQuantity: "كمية غير صالحة",
+    exceedsLimit: "تجاوز الحد",
+    addedProducts: "أضف منتجات لبدء إنشاء الفواتير",
+    addCompaniesFirst: "أضف شركات لبدء إنشاء الفواتير",
+    maxReturn: "الحد الأقصى للإرجاع",
+    alreadyReturned: "تم إرجاعه مسبقاً",
+    soldQty: "المباع",
+    eachPrice: "للوحدة",
+    invoiceRef: "مرجع الفاتورة",
+    positiveBalance: "رصيد إيجابي",
+    negativeBalance: "رصيد سلبي",
+    thankyou: "شكراً لتعاملكم معنا",
+    returnProcessed: "تمت معالجة المرتجع — العملة: دينار أردني",
+    jordanianDinar: "دينار أردني (د.أ)",
+    errorPDF: "فشل إنشاء ملف PDF.",
+    error: "خطأ",
+    deleteProduct: "حذف المنتج",
+    deleteProductConfirm: "هل أنت متأكد من حذف",
+    deleteCompany: "حذف الشركة",
+    deleteCompanyConfirm: "هل أنت متأكد من حذف",
+    missingName: "الاسم مفقود",
+    enterProductName: "يرجى إدخال اسم المنتج.",
+    invalidPrice: "سعر غير صالح",
+    enterValidPrice: "يرجى إدخال سعر صحيح.",
+    missingCompanyName: "الاسم مفقود",
+    enterCompanyName: "يرجى إدخال اسم الشركة.",
+    editInvoice: "تعديل الفاتورة",
+    noAvailableInvoices: "لا توجد فواتير متاحة",
+    createSalesFirst: "قم بإنشاء فاتورة مبيعات أولاً",
+    items_count: "بند",
+    items_count_plural: "بنود",
+  },
+};
+
+export type TKeys = keyof typeof translations.en;
+
+interface LangContextValue {
+  lang: Lang;
+  isRTL: boolean;
+  t: (key: TKeys) => string;
+  setLang: (lang: Lang) => Promise<void>;
+}
+
+const LangContext = createContext<LangContextValue | null>(null);
+
+const LANG_KEY = "@invoice_app/language";
+
+export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const [lang, setLangState] = useState<Lang>("en");
+
+  useEffect(() => {
+    AsyncStorage.getItem(LANG_KEY).then((stored) => {
+      if (stored === "en" || stored === "ar") {
+        setLangState(stored);
+        const shouldBeRTL = stored === "ar";
+        if (I18nManager.isRTL !== shouldBeRTL) {
+          I18nManager.forceRTL(shouldBeRTL);
+        }
+      }
+    });
+  }, []);
+
+  const setLang = useCallback(async (newLang: Lang) => {
+    await AsyncStorage.setItem(LANG_KEY, newLang);
+    setLangState(newLang);
+    const shouldBeRTL = newLang === "ar";
+    if (I18nManager.isRTL !== shouldBeRTL) {
+      I18nManager.forceRTL(shouldBeRTL);
+    }
+  }, []);
+
+  const t = useCallback(
+    (key: TKeys): string => {
+      return translations[lang][key] ?? translations.en[key] ?? key;
+    },
+    [lang]
+  );
+
+  const value = useMemo(
+    () => ({ lang, isRTL: lang === "ar", t, setLang }),
+    [lang, t, setLang]
+  );
+
+  return <LangContext.Provider value={value}>{children}</LangContext.Provider>;
+}
+
+export function useLang() {
+  const ctx = useContext(LangContext);
+  if (!ctx) throw new Error("useLang must be used within LanguageProvider");
+  return ctx;
+}

@@ -2,11 +2,12 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import {
   FlatList,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -15,22 +16,30 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { ReturnInvoice, useApp } from "@/context/AppContext";
+import { useLang } from "@/context/LanguageContext";
 import { formatCurrency, formatDate } from "@/utils/format";
 
 const C = Colors.light;
 
 export default function ReturnsScreen() {
   const insets = useSafeAreaInsets();
-  const { returnInvoices } = useApp();
-  const sorted = [...returnInvoices].reverse();
+  const { returnInvoices, companies } = useApp();
+  const { t, isRTL } = useLang();
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 + 84 : 100;
 
+  const filtered = selectedCompanyId
+    ? returnInvoices.filter((r) => r.companyId === selectedCompanyId)
+    : returnInvoices;
+
+  const sorted = [...filtered].reverse();
+
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: topPad + 12 }]}>
-        <Text style={styles.title}>Returns</Text>
+        <Text style={[styles.title, isRTL && styles.textRTL]}>{t("returns")}</Text>
         <Pressable
           style={styles.addBtn}
           onPress={() => {
@@ -42,15 +51,40 @@ export default function ReturnsScreen() {
         </Pressable>
       </View>
 
+      {companies.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterBar}
+          contentContainerStyle={styles.filterBarContent}
+        >
+          <Pressable
+            style={[styles.filterChip, !selectedCompanyId && styles.filterChipActive]}
+            onPress={() => setSelectedCompanyId(null)}
+          >
+            <Text style={[styles.filterChipText, !selectedCompanyId && styles.filterChipTextActive]}>
+              {t("all")}
+            </Text>
+          </Pressable>
+          {companies.map((c) => (
+            <Pressable
+              key={c.id}
+              style={[styles.filterChip, selectedCompanyId === c.id && styles.filterChipActive]}
+              onPress={() => setSelectedCompanyId(selectedCompanyId === c.id ? null : c.id)}
+            >
+              <Text style={[styles.filterChipText, selectedCompanyId === c.id && styles.filterChipTextActive]}>
+                {c.name}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+
       <FlatList
         data={sorted}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <ReturnCard ret={item} />}
-        contentContainerStyle={{
-          padding: 16,
-          paddingBottom: bottomPad,
-          flexGrow: 1,
-        }}
+        renderItem={({ item }) => <ReturnCard ret={item} isRTL={isRTL} />}
+        contentContainerStyle={{ padding: 16, paddingBottom: bottomPad, flexGrow: 1 }}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!!sorted.length}
         ListEmptyComponent={
@@ -58,16 +92,17 @@ export default function ReturnsScreen() {
             <View style={styles.emptyIcon}>
               <MaterialCommunityIcons name="undo-variant" size={36} color={C.textMuted} />
             </View>
-            <Text style={styles.emptyTitle}>No returns yet</Text>
-            <Text style={styles.emptySub}>
-              Create a return by selecting an existing invoice
+            <Text style={styles.emptyTitle}>
+              {selectedCompanyId ? t("noReturnsForCompany") : t("noReturnsYet")}
             </Text>
-            <Pressable
-              style={styles.emptyBtn}
-              onPress={() => router.push("/return/create")}
-            >
-              <Text style={styles.emptyBtnText}>Create Return</Text>
-            </Pressable>
+            {!selectedCompanyId && (
+              <Pressable
+                style={styles.emptyBtn}
+                onPress={() => router.push("/return/create")}
+              >
+                <Text style={styles.emptyBtnText}>{t("createReturn")}</Text>
+              </Pressable>
+            )}
           </View>
         }
       />
@@ -75,29 +110,37 @@ export default function ReturnsScreen() {
   );
 }
 
-function ReturnCard({ ret }: { ret: ReturnInvoice }) {
+function ReturnCard({ ret, isRTL }: { ret: ReturnInvoice; isRTL: boolean }) {
   return (
     <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed, isRTL && styles.cardRTL]}
       onPress={() => router.push(`/return/${ret.id}`)}
     >
-      <View style={styles.cardLeft}>
+      <View style={[styles.cardLeft, isRTL && styles.cardLeftRTL]}>
         <View style={styles.cardIcon}>
           <MaterialCommunityIcons name="undo-variant" size={20} color={C.danger} />
         </View>
       </View>
       <View style={styles.cardBody}>
-        <View style={styles.cardRow}>
-          <Text style={styles.cardNum}>{ret.returnNumber}</Text>
+        <View style={[styles.cardRow, isRTL && styles.cardRowRTL]}>
+          <Text style={[styles.cardNum, isRTL && styles.textRTL]}>{ret.returnNumber}</Text>
           <Text style={styles.cardAmount}>{formatCurrency(ret.total)}</Text>
         </View>
-        <View style={styles.cardRow}>
-          <Text style={styles.cardCustomer}>{ret.customerName}</Text>
+        {ret.companyName ? (
+          <View style={[styles.companyRow, isRTL && styles.companyRowRTL]}>
+            <Feather name="briefcase" size={11} color="#7C3AED" />
+            <Text style={styles.companyText}>{ret.companyName}</Text>
+          </View>
+        ) : null}
+        <View style={[styles.cardRow, isRTL && styles.cardRowRTL]}>
+          <Text style={[styles.cardCustomer, isRTL && styles.textRTL]}>{ret.customerName}</Text>
           <Text style={styles.cardDate}>{formatDate(ret.date)}</Text>
         </View>
-        <Text style={styles.cardRef}>Ref: {ret.originalInvoiceNumber}</Text>
+        <Text style={[styles.cardRef, isRTL && styles.textRTL]}>
+          Ref: {ret.originalInvoiceNumber}
+        </Text>
       </View>
-      <Feather name="chevron-right" size={18} color={C.textMuted} />
+      <Feather name={isRTL ? "chevron-left" : "chevron-right"} size={18} color={C.textMuted} />
     </Pressable>
   );
 }
@@ -114,11 +157,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: C.border,
   },
-  title: {
-    fontSize: 28,
-    fontFamily: "Inter_700Bold",
-    color: C.text,
-  },
+  title: { fontSize: 28, fontFamily: "Inter_700Bold", color: C.text },
+  textRTL: { textAlign: "right" },
   addBtn: {
     backgroundColor: C.danger,
     width: 38,
@@ -127,6 +167,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  filterBar: {
+    backgroundColor: C.backgroundSecondary,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+    maxHeight: 52,
+  },
+  filterBarContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+    flexDirection: "row",
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: C.borderLight,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  filterChipActive: { backgroundColor: C.danger, borderColor: C.danger },
+  filterChipText: { fontSize: 13, fontFamily: "Inter_500Medium", color: C.textSecondary },
+  filterChipTextActive: { color: "#fff" },
   card: {
     backgroundColor: C.card,
     borderRadius: 16,
@@ -140,87 +203,34 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
+  cardRTL: { flexDirection: "row-reverse" },
   cardPressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   cardLeft: { marginRight: 14 },
+  cardLeftRTL: { marginRight: 0, marginLeft: 14 },
   cardIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 13,
-    backgroundColor: C.dangerLight,
-    justifyContent: "center",
-    alignItems: "center",
+    width: 44, height: 44, borderRadius: 13,
+    backgroundColor: C.dangerLight, justifyContent: "center", alignItems: "center",
   },
   cardBody: { flex: 1 },
   cardRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 3,
+    flexDirection: "row", justifyContent: "space-between",
+    alignItems: "center", marginBottom: 3,
   },
-  cardNum: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-    color: C.text,
-  },
-  cardAmount: {
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-    color: C.danger,
-  },
-  cardCustomer: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: C.textSecondary,
-  },
-  cardDate: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: C.textMuted,
-  },
-  cardRef: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: C.textMuted,
-    marginTop: 2,
-  },
-  empty: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 80,
-  },
+  cardRowRTL: { flexDirection: "row-reverse" },
+  companyRow: { flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 3 },
+  companyRowRTL: { flexDirection: "row-reverse" },
+  companyText: { fontSize: 12, fontFamily: "Inter_500Medium", color: "#7C3AED" },
+  cardNum: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: C.text },
+  cardAmount: { fontSize: 15, fontFamily: "Inter_700Bold", color: C.danger },
+  cardCustomer: { fontSize: 13, fontFamily: "Inter_400Regular", color: C.textSecondary },
+  cardDate: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textMuted },
+  cardRef: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textMuted, marginTop: 2 },
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 80 },
   emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
-    backgroundColor: C.dangerLight,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
+    width: 80, height: 80, borderRadius: 24, backgroundColor: C.dangerLight,
+    justifyContent: "center", alignItems: "center", marginBottom: 16,
   },
-  emptyTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_600SemiBold",
-    color: C.text,
-    marginBottom: 6,
-  },
-  emptySub: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: C.textSecondary,
-    textAlign: "center",
-    paddingHorizontal: 32,
-    marginBottom: 24,
-  },
-  emptyBtn: {
-    backgroundColor: C.danger,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  emptyBtnText: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-    color: "#fff",
-  },
+  emptyTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold", color: C.text, marginBottom: 20, textAlign: "center" },
+  emptyBtn: { backgroundColor: C.danger, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+  emptyBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });

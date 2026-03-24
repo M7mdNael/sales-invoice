@@ -1,0 +1,72 @@
+I already have a working Android app built with Kotlin, Jetpack Compose, Room, and MVVM. It currently supports basic sales invoices, returns, and PDF export.
+I want you to extend the existing project by implementing the following features without breaking current functionality. Modify the existing codebase properly (do not rewrite from scratch).
+1) Add Companies (Customers) System
+Create a new entity:
+Company(id, name, notes)
+Update database:
+Add company_id to SalesInvoice
+Add company_id to ReturnInvoice
+Relationships:
+Each SalesInvoice belongs to one Company
+Each ReturnInvoice belongs to one Company
+UI:
+Create a Companies screen (list, add, edit, delete)
+When creating invoice → user must select a company
+Display company name in invoice list and details
+2) Add Arabic Language Support (RTL)
+Add full Arabic translations using strings.xml
+Create values-ar/strings.xml
+Translate all UI text
+Enable RTL:
+Support right-to-left layout automatically
+Ensure Compose UI respects RTL direction
+Add Settings screen:
+خيار تغيير اللغة (English / Arabic)
+Save language preference locally
+3) Edit Existing Invoice (CRITICAL)
+Allow opening any existing SalesInvoice
+Allow editing:
+company
+products
+quantities
+Logic:
+When editing:
+delete old invoice items
+insert updated items
+recalculate total
+Prevent duplicate entries
+Keep same invoice number
+4) Filter Data by Company
+When user selects a company:
+Show only invoices for that company
+Show only returns for that company
+Reports:
+Add per-company reports:
+total sales
+total returns
+net total
+5) Improve PDF
+Update existing PDF generator to include:
+company name
+proper layout (table-like structure for items)
+support Arabic text rendering
+6) UI Improvements
+Group invoices by company in list
+Show:
+invoice number
+company name
+total (JOD)
+Add navigation to:
+Companies screen
+Edit Invoice screen
+Settings screen
+7) Constraints
+Do NOT break existing features
+Keep database migrations safe (use Room migration if needed)
+Keep app offline only
+Currency remains JOD
+Output Requirements:
+Provide only modified and new files
+Clearly explain where each change goes
+Ensure project compiles without errors
+Modify the existing codebase professionally and maintain clean architecture.
