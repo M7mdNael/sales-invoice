@@ -358,13 +358,12 @@ export async function generateAndShareReturnPDF(invoice: ReturnInvoice, lang: Pd
 export async function downloadSalesPDF(invoice: SalesInvoice, lang: PdfLang = "en"): Promise<void> {
   const html = buildSalesHtml(invoice, lang);
   if (Platform.OS === "web") {
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${invoice.invoiceNumber}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const win = window.open("", "_blank");
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => { win.print(); }, 400);
+    }
     return;
   }
   await Print.printAsync({ html });
@@ -373,13 +372,12 @@ export async function downloadSalesPDF(invoice: SalesInvoice, lang: PdfLang = "e
 export async function downloadReturnPDF(invoice: ReturnInvoice, lang: PdfLang = "en"): Promise<void> {
   const html = buildReturnHtml(invoice, lang);
   if (Platform.OS === "web") {
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${invoice.returnNumber}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const win = window.open("", "_blank");
+    if (win) {
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => { win.print(); }, 400);
+    }
     return;
   }
   await Print.printAsync({ html });
