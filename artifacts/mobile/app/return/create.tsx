@@ -27,7 +27,11 @@ export default function CreateReturnScreen() {
   const insets = useSafeAreaInsets();
   const { salesInvoices, addReturnInvoice, returnInvoices, getNextReturnNumber } = useApp();
   const { t, isRTL } = useLang();
-  const params = useLocalSearchParams<{ invoiceId?: string }>();
+  const params = useLocalSearchParams<{ invoiceId?: string; companyId?: string }>();
+
+  const filteredInvoices = params.companyId
+    ? salesInvoices.filter((inv) => inv.companyId === params.companyId)
+    : salesInvoices;
 
   const [selectedInvoice, setSelectedInvoice] = useState<SalesInvoice | null>(
     params.invoiceId ? salesInvoices.find((inv) => inv.id === params.invoiceId) ?? null : null
@@ -97,7 +101,7 @@ export default function CreateReturnScreen() {
         <View style={styles.pickerHeader}>
           <Text style={[styles.pickerTitle, isRTL && styles.textRTL]}>{t("selectInvoice")}</Text>
         </View>
-        {salesInvoices.length === 0 ? (
+        {filteredInvoices.length === 0 ? (
           <View style={styles.emptyPicker}>
             <Feather name="file-text" size={40} color={C.textMuted} />
             <Text style={[styles.emptyPickerText, isRTL && styles.textRTL]}>{t("noAvailableInvoices")}</Text>
@@ -105,7 +109,7 @@ export default function CreateReturnScreen() {
           </View>
         ) : (
           <FlatList
-            data={[...salesInvoices].reverse()}
+            data={[...filteredInvoices].reverse()}
             keyExtractor={(inv) => inv.id}
             renderItem={({ item }) => (
               <Pressable

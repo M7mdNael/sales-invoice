@@ -52,7 +52,7 @@ export default function CompanyDetailScreen() {
   return (
     <View style={styles.container}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: bottomPad + 20 }}
+        contentContainerStyle={{ paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Company Header */}
@@ -145,7 +145,7 @@ export default function CompanyDetailScreen() {
                 message={t("noInvoicesForCompany")}
                 color={C.tint}
                 bg={C.tintLight}
-                onAdd={() => router.push("/invoice/create")}
+                onAdd={() => router.push({ pathname: "/invoice/create", params: { companyId: id } })}
                 addLabel={t("newInvoice")}
               />
             ) : (
@@ -163,7 +163,7 @@ export default function CompanyDetailScreen() {
               message={t("noReturnsForCompany")}
               color={C.danger}
               bg={C.dangerLight}
-              onAdd={() => router.push("/return/create")}
+              onAdd={() => router.push({ pathname: "/return/create", params: { companyId: id } })}
               addLabel={t("newReturn")}
             />
           ) : (
@@ -173,6 +173,24 @@ export default function CompanyDetailScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* Floating action bar */}
+      <View style={[styles.fabBar, { paddingBottom: bottomPad }]}>
+        <Pressable
+          style={[styles.fabBtn, { backgroundColor: C.tint }]}
+          onPress={() => router.push({ pathname: "/invoice/create", params: { companyId: id } })}
+        >
+          <Feather name="plus" size={16} color="#fff" />
+          <Text style={styles.fabBtnText}>{t("newInvoice")}</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.fabBtn, { backgroundColor: C.danger }]}
+          onPress={() => router.push({ pathname: "/return/create", params: { companyId: id } })}
+        >
+          <Feather name="plus" size={16} color="#fff" />
+          <Text style={styles.fabBtnText}>{t("newReturn")}</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -426,4 +444,24 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   emptyBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
+
+  fabBar: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: C.border,
+    backgroundColor: C.card,
+  },
+  fabBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  fabBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });

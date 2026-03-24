@@ -53,10 +53,14 @@ export default function ReturnDetailScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      t("deleteReturn"),
-      `${t("deleteReturnConfirm")} ${ret.returnNumber}?`,
-      [
+    const msg = `${t("deleteReturnConfirm")} ${ret.returnNumber}?`;
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.confirm(msg)) {
+        deleteReturnInvoice(ret.id);
+        router.replace("/(tabs)/returns");
+      }
+    } else {
+      Alert.alert(t("deleteReturn"), msg, [
         { text: t("cancel"), style: "cancel" },
         {
           text: t("delete"),
@@ -67,8 +71,8 @@ export default function ReturnDetailScreen() {
             router.replace("/(tabs)/returns");
           },
         },
-      ]
-    );
+      ]);
+    }
   };
 
   return (

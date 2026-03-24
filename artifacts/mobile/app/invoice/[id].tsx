@@ -61,10 +61,14 @@ export default function InvoiceDetailScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      t("deleteInvoice"),
-      `${t("deleteInvoiceConfirm")} ${invoice.invoiceNumber}?`,
-      [
+    const msg = `${t("deleteInvoiceConfirm")} ${invoice.invoiceNumber}?`;
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.confirm(msg)) {
+        deleteSalesInvoice(invoice.id);
+        router.replace("/(tabs)/invoices");
+      }
+    } else {
+      Alert.alert(t("deleteInvoice"), msg, [
         { text: t("cancel"), style: "cancel" },
         {
           text: t("delete"),
@@ -75,8 +79,8 @@ export default function InvoiceDetailScreen() {
             router.replace("/(tabs)/invoices");
           },
         },
-      ]
-    );
+      ]);
+    }
   };
 
   return (

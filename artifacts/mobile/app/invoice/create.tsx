@@ -35,7 +35,7 @@ type View = "form" | "productPicker" | "companyPicker";
 
 export default function CreateInvoiceScreen() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ editId?: string }>();
+  const params = useLocalSearchParams<{ editId?: string; companyId?: string }>();
   const { products, companies, salesInvoices, addSalesInvoice, updateSalesInvoice, getNextInvoiceNumber } = useApp();
   const { t, isRTL } = useLang();
 
@@ -45,7 +45,9 @@ export default function CreateInvoiceScreen() {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(
     existingInvoice?.companyId
       ? (companies.find((c) => c.id === existingInvoice.companyId) ?? null)
-      : null
+      : params.companyId
+        ? (companies.find((c) => c.id === params.companyId) ?? null)
+        : null
   );
   const [cart, setCart] = useState<CartItem[]>(() => {
     if (existingInvoice) {
