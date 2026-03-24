@@ -16,7 +16,9 @@
     "ios": {
       "supportsTablet": false
     },
-    "android": {},
+    "android": {
+      "package": "com.salesinvoiceapp.mobile"
+    },
     "web": {
       "favicon": "./assets/images/favicon.png"
     },
