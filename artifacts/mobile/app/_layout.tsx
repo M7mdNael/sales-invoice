@@ -70,6 +70,10 @@ function RootLayoutNav() {
         name="settings/index"
         options={{ title: "Settings" }}
       />
+      <Stack.Screen
+        name="trash"
+        options={{ title: "Trash" }}
+      />
     </Stack>
   );
 }

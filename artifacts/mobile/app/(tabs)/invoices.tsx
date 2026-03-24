@@ -22,8 +22,9 @@ const C = Colors.light;
 
 export default function InvoicesScreen() {
   const insets = useSafeAreaInsets();
-  const { salesInvoices, companies } = useApp();
+  const { salesInvoices, companies, trashedInvoices, trashedReturns, deleteSalesInvoice } = useApp();
   const { t, isRTL } = useLang();
+  const trashCount = trashedInvoices.length + trashedReturns.length;
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
@@ -57,15 +58,28 @@ export default function InvoicesScreen() {
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: topPad + 12 }]}>
         <Text style={[styles.title, isRTL && styles.textRTL]}>{t("invoices")}</Text>
-        <Pressable
-          style={styles.addBtn}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push("/invoice/create");
-          }}
-        >
-          <Feather name="plus" size={20} color="#fff" />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            style={styles.trashBtn}
+            onPress={() => router.push("/trash")}
+          >
+            <Feather name="trash-2" size={18} color={C.textMuted} />
+            {trashCount > 0 && (
+              <View style={styles.trashBadge}>
+                <Text style={styles.trashBadgeText}>{trashCount}</Text>
+              </View>
+            )}
+          </Pressable>
+          <Pressable
+            style={styles.addBtn}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("/invoice/create");
+            }}
+          >
+            <Feather name="plus" size={20} color="#fff" />
+          </Pressable>
+        </View>
       </View>
 
       {companies.length > 0 && (
@@ -109,7 +123,18 @@ export default function InvoicesScreen() {
               </View>
             )}
             {item.invoices.map((inv) => (
-              <InvoiceCard key={inv.id} invoice={inv} isRTL={isRTL} />
+              <InvoiceCard key={inv.id} invoice={inv} isRTL={isRTL} onDelete={() => {
+                const msg = `Move ${inv.invoiceNumber} to trash?`;
+                if (Platform.OS === "web") {
+                  if (typeof window !== "undefined" && window.confirm(msg)) deleteSalesInvoice(inv.id);
+                } else {
+                  const { Alert } = require("react-native");
+                  Alert.alert("Move to Trash", msg, [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Move to Trash", style: "destructive", onPress: () => deleteSalesInvoice(inv.id) },
+                  ]);
+                }
+              }} />
             ))}
           </View>
         )}
@@ -142,7 +167,7 @@ export default function InvoicesScreen() {
   );
 }
 
-function InvoiceCard({ invoice, isRTL }: { invoice: SalesInvoice; isRTL: boolean }) {
+function InvoiceCard({ invoice, isRTL, onDelete }: { invoice: SalesInvoice; isRTL: boolean; onDelete: () => void }) {
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed, isRTL && styles.cardRTL]}
@@ -172,6 +197,9 @@ function InvoiceCard({ invoice, isRTL }: { invoice: SalesInvoice; isRTL: boolean
           {invoice.items.length} item{invoice.items.length !== 1 ? "s" : ""}
         </Text>
       </View>
+      <Pressable style={styles.cardTrashBtn} onPress={(e) => { e.stopPropagation?.(); onDelete(); }}>
+        <Feather name="trash-2" size={16} color={C.danger} />
+      </Pressable>
       <Feather name={isRTL ? "chevron-left" : "chevron-right"} size={18} color={C.textMuted} />
     </Pressable>
   );
@@ -191,6 +219,28 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 28, fontFamily: "Inter_700Bold", color: C.text },
   textRTL: { textAlign: "right" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  trashBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: C.borderLight,
+  },
+  trashBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: C.danger,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 3,
+  },
+  trashBadgeText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#fff" },
   addBtn: {
     backgroundColor: C.tint,
     width: 38,
@@ -198,6 +248,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
+  },
+  cardTrashBtn: {
+    padding: 6,
+    marginRight: 4,
   },
   filterBar: {
     backgroundColor: C.backgroundSecondary,

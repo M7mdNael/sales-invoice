@@ -65,6 +65,8 @@ interface AppContextValue {
   products: Product[];
   salesInvoices: SalesInvoice[];
   returnInvoices: ReturnInvoice[];
+  trashedInvoices: SalesInvoice[];
+  trashedReturns: ReturnInvoice[];
   isLoading: boolean;
   addCompany: (name: string, notes: string) => Company;
   updateCompany: (id: string, name: string, notes: string) => void;
@@ -89,6 +91,11 @@ interface AppContextValue {
   ) => ReturnInvoice;
   deleteSalesInvoice: (id: string) => void;
   deleteReturnInvoice: (id: string) => void;
+  restoreSalesInvoice: (id: string) => void;
+  restoreReturnInvoice: (id: string) => void;
+  permanentlyDeleteInvoice: (id: string) => void;
+  permanentlyDeleteReturn: (id: string) => void;
+  emptyTrash: () => void;
   getNextInvoiceNumber: () => string;
   getNextReturnNumber: () => string;
 }
@@ -100,6 +107,8 @@ const STORAGE_KEYS = {
   products: "@invoice_app/products",
   salesInvoices: "@invoice_app/sales_invoices",
   returnInvoices: "@invoice_app/return_invoices",
+  trashedInvoices: "@invoice_app/trashed_invoices",
+  trashedReturns: "@invoice_app/trashed_returns",
   invoiceCounter: "@invoice_app/invoice_counter",
   returnCounter: "@invoice_app/return_counter",
 };
@@ -141,6 +150,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [salesInvoices, setSalesInvoices] = useState<SalesInvoice[]>([]);
   const [returnInvoices, setReturnInvoices] = useState<ReturnInvoice[]>([]);
+  const [trashedInvoices, setTrashedInvoices] = useState<SalesInvoice[]>([]);
+  const [trashedReturns, setTrashedReturns] = useState<ReturnInvoice[]>([]);
   const [invoiceCounter, setInvoiceCounter] = useState(0);
   const [returnCounter, setReturnCounter] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -148,11 +159,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const load = async () => {
       try {
-        const [c, p, s, r, ic, rc] = await Promise.all([
+        const [c, p, s, r, ti, tr, ic, rc] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.companies),
           AsyncStorage.getItem(STORAGE_KEYS.products),
           AsyncStorage.getItem(STORAGE_KEYS.salesInvoices),
           AsyncStorage.getItem(STORAGE_KEYS.returnInvoices),
+          AsyncStorage.getItem(STORAGE_KEYS.trashedInvoices),
+          AsyncStorage.getItem(STORAGE_KEYS.trashedReturns),
           AsyncStorage.getItem(STORAGE_KEYS.invoiceCounter),
           AsyncStorage.getItem(STORAGE_KEYS.returnCounter),
         ]);
@@ -166,6 +179,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const parsed = JSON.parse(r);
           setReturnInvoices(parsed.map(migrateReturnInvoice));
         }
+        if (ti) setTrashedInvoices(JSON.parse(ti).map(migrateSalesInvoice));
+        if (tr) setTrashedReturns(JSON.parse(tr).map(migrateReturnInvoice));
         if (ic) setInvoiceCounter(parseInt(ic, 10));
         if (rc) setReturnCounter(parseInt(rc, 10));
       } catch (e) {
@@ -191,6 +206,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const saveReturnInvoices = useCallback(async (data: ReturnInvoice[]) => {
     await AsyncStorage.setItem(STORAGE_KEYS.returnInvoices, JSON.stringify(data));
+  }, []);
+
+  const saveTrashedInvoices = useCallback(async (data: SalesInvoice[]) => {
+    await AsyncStorage.setItem(STORAGE_KEYS.trashedInvoices, JSON.stringify(data));
+  }, []);
+
+  const saveTrashedReturns = useCallback(async (data: ReturnInvoice[]) => {
+    await AsyncStorage.setItem(STORAGE_KEYS.trashedReturns, JSON.stringify(data));
   }, []);
 
   const addCompany = useCallback(
@@ -336,21 +359,84 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const deleteSalesInvoice = useCallback(
     (id: string) => {
-      const updated = salesInvoices.filter((inv) => inv.id !== id);
-      setSalesInvoices(updated);
-      saveSalesInvoices(updated);
+      const item = salesInvoices.find((inv) => inv.id === id);
+      if (!item) return;
+      const updatedActive = salesInvoices.filter((inv) => inv.id !== id);
+      const updatedTrash = [...trashedInvoices, item];
+      setSalesInvoices(updatedActive);
+      setTrashedInvoices(updatedTrash);
+      saveSalesInvoices(updatedActive);
+      saveTrashedInvoices(updatedTrash);
     },
-    [salesInvoices, saveSalesInvoices]
+    [salesInvoices, trashedInvoices, saveSalesInvoices, saveTrashedInvoices]
   );
 
   const deleteReturnInvoice = useCallback(
     (id: string) => {
-      const updated = returnInvoices.filter((r) => r.id !== id);
-      setReturnInvoices(updated);
-      saveReturnInvoices(updated);
+      const item = returnInvoices.find((r) => r.id === id);
+      if (!item) return;
+      const updatedActive = returnInvoices.filter((r) => r.id !== id);
+      const updatedTrash = [...trashedReturns, item];
+      setReturnInvoices(updatedActive);
+      setTrashedReturns(updatedTrash);
+      saveReturnInvoices(updatedActive);
+      saveTrashedReturns(updatedTrash);
     },
-    [returnInvoices, saveReturnInvoices]
+    [returnInvoices, trashedReturns, saveReturnInvoices, saveTrashedReturns]
   );
+
+  const restoreSalesInvoice = useCallback(
+    (id: string) => {
+      const item = trashedInvoices.find((inv) => inv.id === id);
+      if (!item) return;
+      const updatedTrash = trashedInvoices.filter((inv) => inv.id !== id);
+      const updatedActive = [...salesInvoices, item];
+      setTrashedInvoices(updatedTrash);
+      setSalesInvoices(updatedActive);
+      saveTrashedInvoices(updatedTrash);
+      saveSalesInvoices(updatedActive);
+    },
+    [trashedInvoices, salesInvoices, saveTrashedInvoices, saveSalesInvoices]
+  );
+
+  const restoreReturnInvoice = useCallback(
+    (id: string) => {
+      const item = trashedReturns.find((r) => r.id === id);
+      if (!item) return;
+      const updatedTrash = trashedReturns.filter((r) => r.id !== id);
+      const updatedActive = [...returnInvoices, item];
+      setTrashedReturns(updatedTrash);
+      setReturnInvoices(updatedActive);
+      saveTrashedReturns(updatedTrash);
+      saveReturnInvoices(updatedActive);
+    },
+    [trashedReturns, returnInvoices, saveTrashedReturns, saveReturnInvoices]
+  );
+
+  const permanentlyDeleteInvoice = useCallback(
+    (id: string) => {
+      const updated = trashedInvoices.filter((inv) => inv.id !== id);
+      setTrashedInvoices(updated);
+      saveTrashedInvoices(updated);
+    },
+    [trashedInvoices, saveTrashedInvoices]
+  );
+
+  const permanentlyDeleteReturn = useCallback(
+    (id: string) => {
+      const updated = trashedReturns.filter((r) => r.id !== id);
+      setTrashedReturns(updated);
+      saveTrashedReturns(updated);
+    },
+    [trashedReturns, saveTrashedReturns]
+  );
+
+  const emptyTrash = useCallback(() => {
+    setTrashedInvoices([]);
+    setTrashedReturns([]);
+    saveTrashedInvoices([]);
+    saveTrashedReturns([]);
+  }, [saveTrashedInvoices, saveTrashedReturns]);
 
   const value = useMemo(
     () => ({
@@ -358,6 +444,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       products,
       salesInvoices,
       returnInvoices,
+      trashedInvoices,
+      trashedReturns,
       isLoading,
       addCompany,
       updateCompany,
@@ -370,6 +458,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addReturnInvoice,
       deleteSalesInvoice,
       deleteReturnInvoice,
+      restoreSalesInvoice,
+      restoreReturnInvoice,
+      permanentlyDeleteInvoice,
+      permanentlyDeleteReturn,
+      emptyTrash,
       getNextInvoiceNumber,
       getNextReturnNumber,
     }),
@@ -378,6 +471,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       products,
       salesInvoices,
       returnInvoices,
+      trashedInvoices,
+      trashedReturns,
       isLoading,
       addCompany,
       updateCompany,
@@ -390,6 +485,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addReturnInvoice,
       deleteSalesInvoice,
       deleteReturnInvoice,
+      restoreSalesInvoice,
+      restoreReturnInvoice,
+      permanentlyDeleteInvoice,
+      permanentlyDeleteReturn,
+      emptyTrash,
       getNextInvoiceNumber,
       getNextReturnNumber,
     ]
