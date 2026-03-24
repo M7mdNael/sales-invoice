@@ -107,10 +107,12 @@ export default function ReturnDetailScreen() {
           ) : null}
 
           <Text style={[styles.customer, isRTL && styles.textRTL]}>{ret.customerName || "—"}</Text>
-          <View style={[styles.refRow, isRTL && styles.refRowRTL]}>
-            <Feather name="link" size={12} color={C.textMuted} />
-            <Text style={styles.refText}>{t("ref")}: {ret.originalInvoiceNumber}</Text>
-          </View>
+          {ret.originalInvoiceNumber ? (
+            <View style={[styles.refRow, isRTL && styles.refRowRTL]}>
+              <Feather name="link" size={12} color={C.textMuted} />
+              <Text style={styles.refText}>{t("ref")}: {ret.originalInvoiceNumber}</Text>
+            </View>
+          ) : null}
           <Text style={[styles.dateText, isRTL && styles.textRTL]}>{formatDate(ret.date)}</Text>
         </View>
 

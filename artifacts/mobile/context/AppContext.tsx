@@ -89,6 +89,10 @@ interface AppContextValue {
     originalInvoice: SalesInvoice,
     items: Omit<ReturnItem, "id">[]
   ) => ReturnInvoice;
+  addStandaloneReturn: (
+    company: Company,
+    items: Omit<ReturnItem, "id">[]
+  ) => ReturnInvoice;
   deleteSalesInvoice: (id: string) => void;
   deleteReturnInvoice: (id: string) => void;
   restoreSalesInvoice: (id: string) => void;
@@ -357,6 +361,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [returnCounter, returnInvoices, saveReturnInvoices]
   );
 
+  const addStandaloneReturn = useCallback(
+    (company: Company, items: Omit<ReturnItem, "id">[]) => {
+      const next = returnCounter + 1;
+      const returnInv: ReturnInvoice = {
+        id: generateId(),
+        returnNumber: `RET-${String(next).padStart(4, "0")}`,
+        originalInvoiceId: "",
+        originalInvoiceNumber: "",
+        companyId: company.id,
+        companyName: company.name,
+        customerName: company.name,
+        date: new Date().toISOString(),
+        items: items.map((item) => ({ ...item, id: generateId() })),
+        total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+      };
+      const updated = [...returnInvoices, returnInv];
+      setReturnInvoices(updated);
+      saveReturnInvoices(updated);
+      setReturnCounter(next);
+      AsyncStorage.setItem(STORAGE_KEYS.returnCounter, String(next));
+      return returnInv;
+    },
+    [returnCounter, returnInvoices, saveReturnInvoices]
+  );
+
   const deleteSalesInvoice = useCallback(
     (id: string) => {
       const item = salesInvoices.find((inv) => inv.id === id);
@@ -456,6 +485,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addSalesInvoice,
       updateSalesInvoice,
       addReturnInvoice,
+      addStandaloneReturn,
       deleteSalesInvoice,
       deleteReturnInvoice,
       restoreSalesInvoice,
@@ -483,6 +513,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addSalesInvoice,
       updateSalesInvoice,
       addReturnInvoice,
+      addStandaloneReturn,
       deleteSalesInvoice,
       deleteReturnInvoice,
       restoreSalesInvoice,

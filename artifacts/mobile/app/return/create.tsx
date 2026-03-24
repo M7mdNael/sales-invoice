@@ -1,5 +1,4 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Feather } from "@expo/vector-icons";
+import { MaterialCommunityIcons, Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
@@ -11,121 +10,174 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
-import { ReturnItem, SalesInvoice, useApp } from "@/context/AppContext";
+import { Company, Product, ReturnItem, useApp } from "@/context/AppContext";
 import { useLang } from "@/context/LanguageContext";
-import { formatCurrency, formatDate } from "@/utils/format";
+import { formatCurrency } from "@/utils/format";
 
 const C = Colors.light;
 
+interface CartItem {
+  product: Product;
+  quantity: number;
+}
+
+type CurrentView = "form" | "productPicker" | "companyPicker";
+
 export default function CreateReturnScreen() {
   const insets = useSafeAreaInsets();
-  const { salesInvoices, addReturnInvoice, returnInvoices, getNextReturnNumber } = useApp();
+  const params = useLocalSearchParams<{ companyId?: string }>();
+  const { products, companies, addStandaloneReturn, getNextReturnNumber } = useApp();
   const { t, isRTL } = useLang();
-  const params = useLocalSearchParams<{ invoiceId?: string; companyId?: string }>();
 
-  const filteredInvoices = params.companyId
-    ? salesInvoices.filter((inv) => inv.companyId === params.companyId)
-    : salesInvoices;
-
-  const [selectedInvoice, setSelectedInvoice] = useState<SalesInvoice | null>(
-    params.invoiceId ? salesInvoices.find((inv) => inv.id === params.invoiceId) ?? null : null
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(
+    params.companyId ? (companies.find((c) => c.id === params.companyId) ?? null) : null
   );
-  const [showInvoicePicker, setShowInvoicePicker] = useState(!params.invoiceId);
-  const [returnQtys, setReturnQtys] = useState<Record<string, string>>({});
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [currentView, setCurrentView] = useState<CurrentView>("form");
   const [saving, setSaving] = useState(false);
 
   const returnNumber = getNextReturnNumber();
+  const total = cart.reduce((s, c) => s + c.product.price * c.quantity, 0);
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom + 16;
 
-  const getReturnedQty = (invoiceId: string, productId: string) => {
-    return returnInvoices
-      .filter((r) => r.originalInvoiceId === invoiceId)
-      .flatMap((r) => r.items)
-      .filter((item) => item.productId === productId)
-      .reduce((sum, item) => sum + item.quantity, 0);
+  const addToCart = (product: Product) => {
+    const existing = cart.find((c) => c.product.id === product.id);
+    if (existing) {
+      setCart(cart.map((c) => c.product.id === product.id ? { ...c, quantity: c.quantity + 1 } : c));
+    } else {
+      setCart([...cart, { product, quantity: 1 }]);
+    }
+    setCurrentView("form");
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
-  const totalReturn = selectedInvoice
-    ? selectedInvoice.items.reduce((sum, item) => {
-        const qty = parseInt(returnQtys[item.productId] ?? "0", 10) || 0;
-        return sum + qty * item.price;
-      }, 0)
-    : 0;
-
-  const handleSelectInvoice = (inv: SalesInvoice) => {
-    setSelectedInvoice(inv);
-    setReturnQtys({});
-    setShowInvoicePicker(false);
+  const updateQty = (productId: string, qty: number) => {
+    if (qty <= 0) {
+      setCart(cart.filter((c) => c.product.id !== productId));
+    } else {
+      setCart(cart.map((c) => c.product.id === productId ? { ...c, quantity: qty } : c));
+    }
   };
 
   const handleSave = () => {
-    if (!selectedInvoice) return;
-    const items: Omit<ReturnItem, "id">[] = selectedInvoice.items
-      .map((item) => {
-        const qty = parseInt(returnQtys[item.productId] ?? "0", 10) || 0;
-        const alreadyReturned = getReturnedQty(selectedInvoice.id, item.productId);
-        const maxReturn = item.quantity - alreadyReturned;
-        if (qty > maxReturn) {
-          Alert.alert(
-            t("invalidQuantity"),
-            `${t("exceedsLimit")} ${item.productName}: ${maxReturn}`
-          );
-          return null;
-        }
-        return qty > 0
-          ? { productId: item.productId, productName: item.productName, quantity: qty, price: item.price }
-          : null;
-      })
-      .filter(Boolean) as Omit<ReturnItem, "id">[];
-
-    if (items.length === 0) {
-      Alert.alert(t("noItems"), t("enterReturnQty"));
+    if (!selectedCompany) {
+      Alert.alert(t("missingInfo"), t("selectCompanyFirst"));
+      return;
+    }
+    if (cart.length === 0) {
+      Alert.alert(t("emptyInvoice"), t("addOneProduct"));
       return;
     }
     setSaving(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const ret = addReturnInvoice(selectedInvoice, items);
+    const items: Omit<ReturnItem, "id">[] = cart.map((c) => ({
+      productId: c.product.id,
+      productName: c.product.name,
+      quantity: c.quantity,
+      price: c.product.price,
+    }));
+    const ret = addStandaloneReturn(selectedCompany, items);
     router.dismissAll();
     router.push(`/return/${ret.id}`);
   };
 
-  if (showInvoicePicker || !selectedInvoice) {
+  if (currentView === "companyPicker") {
     return (
       <View style={styles.container}>
         <View style={styles.pickerHeader}>
-          <Text style={[styles.pickerTitle, isRTL && styles.textRTL]}>{t("selectInvoice")}</Text>
+          <Text style={styles.pickerTitle}>{t("selectCompany")}</Text>
+          <Pressable onPress={() => setCurrentView("form")}>
+            <Feather name="x" size={24} color={C.text} />
+          </Pressable>
         </View>
-        {filteredInvoices.length === 0 ? (
+        {companies.length === 0 ? (
           <View style={styles.emptyPicker}>
-            <Feather name="file-text" size={40} color={C.textMuted} />
-            <Text style={[styles.emptyPickerText, isRTL && styles.textRTL]}>{t("noAvailableInvoices")}</Text>
-            <Text style={[styles.emptyPickerSub, isRTL && styles.textRTL]}>{t("createSalesFirst")}</Text>
+            <Feather name="briefcase" size={40} color={C.textMuted} />
+            <Text style={styles.emptyPickerText}>{t("noCompaniesYet")}</Text>
+            <Pressable
+              style={styles.goToBtn}
+              onPress={() => {
+                setCurrentView("form");
+                router.push("/companies/");
+              }}
+            >
+              <Text style={styles.goToBtnText}>{t("addCompany")}</Text>
+            </Pressable>
           </View>
         ) : (
           <FlatList
-            data={[...filteredInvoices].reverse()}
-            keyExtractor={(inv) => inv.id}
+            data={companies}
+            keyExtractor={(c) => c.id}
             renderItem={({ item }) => (
               <Pressable
-                style={({ pressed }) => [styles.invPickerItem, pressed && styles.invPickerItemPressed, isRTL && styles.invPickerItemRTL]}
-                onPress={() => handleSelectInvoice(item)}
+                style={({ pressed }) => [styles.pickerItem, pressed && styles.pickerItemPressed]}
+                onPress={() => {
+                  setSelectedCompany(item);
+                  setCurrentView("form");
+                }}
               >
-                <View style={styles.invPickerLeft}>
-                  <Text style={[styles.invPickerNum, isRTL && styles.textRTL]}>{item.invoiceNumber}</Text>
-                  {item.companyName ? (
-                    <Text style={[styles.invPickerCompany, isRTL && styles.textRTL]}>{item.companyName}</Text>
-                  ) : null}
-                  <Text style={[styles.invPickerCustomer, isRTL && styles.textRTL]}>{item.customerName}</Text>
-                  <Text style={[styles.invPickerDate, isRTL && styles.textRTL]}>{formatDate(item.date)}</Text>
+                <View style={styles.pickerItemIcon}>
+                  <Feather name="briefcase" size={18} color="#7C3AED" />
                 </View>
-                <Text style={styles.invPickerTotal}>{formatCurrency(item.total)}</Text>
-                <Feather name={isRTL ? "chevron-left" : "chevron-right"} size={18} color={C.textMuted} />
+                <View style={styles.pickerItemInfo}>
+                  <Text style={styles.pickerItemName}>{item.name}</Text>
+                  {item.notes ? <Text style={styles.pickerItemSub}>{item.notes}</Text> : null}
+                </View>
+                {selectedCompany?.id === item.id && (
+                  <Feather name="check" size={20} color={C.danger} />
+                )}
+              </Pressable>
+            )}
+            ItemSeparatorComponent={() => <View style={styles.sep} />}
+            contentContainerStyle={{ padding: 16 }}
+          />
+        )}
+      </View>
+    );
+  }
+
+  if (currentView === "productPicker") {
+    return (
+      <View style={styles.container}>
+        <View style={styles.pickerHeader}>
+          <Text style={styles.pickerTitle}>{t("addProduct")}</Text>
+          <Pressable onPress={() => setCurrentView("form")}>
+            <Feather name="x" size={24} color={C.text} />
+          </Pressable>
+        </View>
+        {products.length === 0 ? (
+          <View style={styles.emptyPicker}>
+            <Feather name="package" size={40} color={C.textMuted} />
+            <Text style={styles.emptyPickerText}>{t("noProductsYet")}</Text>
+            <Pressable
+              style={styles.goToBtn}
+              onPress={() => {
+                setCurrentView("form");
+                router.push("/products/");
+              }}
+            >
+              <Text style={styles.goToBtnText}>{t("addProduct")}</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <FlatList
+            data={products}
+            keyExtractor={(p) => p.id}
+            renderItem={({ item }) => (
+              <Pressable
+                style={({ pressed }) => [styles.pickerItem, pressed && styles.pickerItemPressed]}
+                onPress={() => addToCart(item)}
+              >
+                <View style={styles.pickerItemInfo}>
+                  <Text style={styles.pickerItemName}>{item.name}</Text>
+                  <Text style={styles.pickerItemPrice}>{formatCurrency(item.price)}</Text>
+                </View>
+                <Feather name="plus-circle" size={22} color={C.danger} />
               </Pressable>
             )}
             ItemSeparatorComponent={() => <View style={styles.sep} />}
@@ -148,80 +200,64 @@ export default function CreateReturnScreen() {
           <Text style={styles.returnNumText}>{returnNumber}</Text>
         </View>
 
-        <View style={[styles.refCard, isRTL && styles.refCardRTL]}>
-          <View>
-            <Text style={[styles.refLabel, isRTL && styles.textRTL]}>{t("originalInvoice")}</Text>
-            <Text style={[styles.refValue, isRTL && styles.textRTL]}>{selectedInvoice.invoiceNumber}</Text>
-          </View>
-          {selectedInvoice.companyName ? (
-            <View>
-              <Text style={[styles.refLabel, isRTL && styles.textRTL]}>{t("company")}</Text>
-              <Text style={[styles.refValue, { color: "#7C3AED" }, isRTL && styles.textRTL]}>
-                {selectedInvoice.companyName}
-              </Text>
+        <Text style={[styles.fieldLabel, isRTL && styles.textRTL]}>{t("company")} *</Text>
+        <Pressable
+          style={[styles.companySelector, selectedCompany && styles.companySelectorFilled]}
+          onPress={() => setCurrentView("companyPicker")}
+        >
+          {selectedCompany ? (
+            <View style={styles.companySelectorInner}>
+              <View style={styles.companySelectorIcon}>
+                <Feather name="briefcase" size={16} color="#7C3AED" />
+              </View>
+              <Text style={styles.companySelectorName}>{selectedCompany.name}</Text>
+              <Text style={styles.companySelectorChange}>{t("changeCompany")}</Text>
             </View>
-          ) : null}
-          <View>
-            <Text style={[styles.refLabel, isRTL && styles.textRTL]}>{t("customer")}</Text>
-            <Text style={[styles.refValue, isRTL && styles.textRTL]}>{selectedInvoice.customerName}</Text>
-          </View>
-          <Pressable onPress={() => setShowInvoicePicker(true)} style={styles.changeBtn}>
-            <Text style={styles.changeBtnText}>{t("changeCompany")}</Text>
+          ) : (
+            <View style={styles.companySelectorInner}>
+              <Feather name="briefcase" size={18} color={C.textMuted} />
+              <Text style={styles.companySelectorPlaceholder}>{t("selectCompany")}</Text>
+              <Feather name="chevron-down" size={18} color={C.textMuted} />
+            </View>
+          )}
+        </Pressable>
+
+        <View style={[styles.sectionHeader, isRTL && styles.sectionHeaderRTL]}>
+          <Text style={[styles.fieldLabel, isRTL && styles.textRTL, { marginBottom: 0 }]}>
+            {t("returnedItems")}
+          </Text>
+          <Pressable style={styles.addProductBtn} onPress={() => setCurrentView("productPicker")}>
+            <Feather name="plus" size={16} color={C.danger} />
+            <Text style={styles.addProductBtnText}>{t("addProduct")}</Text>
           </Pressable>
         </View>
 
-        <Text style={[styles.fieldLabel, isRTL && styles.textRTL]}>{t("returnedItems")}</Text>
-
-        <View style={styles.itemsCard}>
-          {selectedInvoice.items.map((item, i) => {
-            const alreadyReturned = getReturnedQty(selectedInvoice.id, item.productId);
-            const maxReturn = item.quantity - alreadyReturned;
-            return (
-              <React.Fragment key={item.productId}>
+        {cart.length === 0 ? (
+          <Pressable style={styles.emptyCart} onPress={() => setCurrentView("productPicker")}>
+            <MaterialCommunityIcons name="undo-variant" size={28} color={C.textMuted} />
+            <Text style={styles.emptyCartText}>{t("addTapToAdd")}</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.cartCard}>
+            {cart.map((item, i) => (
+              <React.Fragment key={item.product.id}>
                 {i > 0 && <View style={styles.sep} />}
-                <View style={[styles.itemRow, isRTL && styles.itemRowRTL]}>
-                  <View style={styles.itemInfo}>
-                    <Text style={[styles.itemName, isRTL && styles.textRTL]}>{item.productName}</Text>
-                    <Text style={[styles.itemSold, isRTL && styles.textRTL]}>
-                      {t("soldQty")}: {item.quantity} · {t("maxReturn")}: {maxReturn}
-                    </Text>
-                    <Text style={[styles.itemPrice, isRTL && styles.textRTL]}>
-                      {formatCurrency(item.price)} {t("eachPrice")}
-                    </Text>
-                  </View>
-                  <TextInput
-                    style={[styles.qtyInput, maxReturn === 0 && styles.qtyInputDisabled]}
-                    placeholder="0"
-                    placeholderTextColor={C.textMuted}
-                    keyboardType="number-pad"
-                    value={returnQtys[item.productId] ?? ""}
-                    editable={maxReturn > 0}
-                    onChangeText={(text) => {
-                      const n = parseInt(text, 10) || 0;
-                      if (n > maxReturn) {
-                        Alert.alert(t("exceedsLimit"), `${t("maxReturn")} ${item.productName}: ${maxReturn}`);
-                        return;
-                      }
-                      setReturnQtys({ ...returnQtys, [item.productId]: text });
-                    }}
-                    maxLength={4}
-                  />
-                </View>
+                <CartRow item={item} onUpdateQty={updateQty} eachLabel={t("eachPrice")} />
               </React.Fragment>
-            );
-          })}
-          <View style={[styles.totalRow, isRTL && styles.totalRowRTL]}>
-            <Text style={[styles.totalLabel, isRTL && styles.textRTL]}>{t("totalRefund")}</Text>
-            <Text style={styles.totalValue}>{formatCurrency(totalReturn)}</Text>
+            ))}
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>{t("totalRefund")}</Text>
+              <Text style={styles.totalValue}>{formatCurrency(total)}</Text>
+            </View>
           </View>
-        </View>
+        )}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: bottomPad }]}>
         <Pressable
-          style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+          style={[styles.saveBtn, (saving || cart.length === 0) && styles.saveBtnDisabled]}
           onPress={handleSave}
-          disabled={saving}
+          disabled={saving || cart.length === 0}
         >
           <Feather name="check" size={18} color="#fff" />
           <Text style={styles.saveBtnText}>{t("createReturnBtn")}</Text>
@@ -231,56 +267,107 @@ export default function CreateReturnScreen() {
   );
 }
 
+function CartRow({
+  item,
+  onUpdateQty,
+  eachLabel,
+}: {
+  item: CartItem;
+  onUpdateQty: (id: string, qty: number) => void;
+  eachLabel: string;
+}) {
+  return (
+    <View style={styles.cartRow}>
+      <View style={styles.cartInfo}>
+        <Text style={styles.cartName}>{item.product.name}</Text>
+        <Text style={styles.cartPrice}>{formatCurrency(item.product.price)} {eachLabel}</Text>
+      </View>
+      <View style={styles.qtyControl}>
+        <Pressable
+          style={styles.qtyBtn}
+          onPress={() => onUpdateQty(item.product.id, item.quantity - 1)}
+        >
+          <Feather
+            name={item.quantity === 1 ? "trash-2" : "minus"}
+            size={14}
+            color={C.danger}
+          />
+        </Pressable>
+        <Text style={styles.qtyText}>{item.quantity}</Text>
+        <Pressable
+          style={styles.qtyBtn}
+          onPress={() => onUpdateQty(item.product.id, item.quantity + 1)}
+        >
+          <Feather name="plus" size={14} color={C.danger} />
+        </Pressable>
+      </View>
+      <Text style={styles.cartLineTotal}>
+        {formatCurrency(item.product.price * item.quantity)}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.background },
   returnNumBadge: {
     flexDirection: "row", alignItems: "center", gap: 6,
     backgroundColor: C.dangerLight, alignSelf: "flex-start",
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 16,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 20,
   },
   returnNumText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: C.danger },
-  refCard: {
-    backgroundColor: C.card, borderRadius: 16, padding: 16, marginBottom: 20,
-    gap: 8, flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between",
-    alignItems: "flex-end", shadowColor: C.shadow, shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 1, shadowRadius: 4, elevation: 1,
-  },
-  refCardRTL: { flexDirection: "row-reverse" },
-  refLabel: {
-    fontSize: 11, fontFamily: "Inter_500Medium", color: C.textMuted,
-    textTransform: "uppercase", letterSpacing: 0.4, marginBottom: 2,
-  },
-  refValue: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: C.text },
-  changeBtn: { backgroundColor: C.borderLight, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-  changeBtnText: { fontSize: 13, fontFamily: "Inter_500Medium", color: C.textSecondary },
   fieldLabel: {
     fontSize: 13, fontFamily: "Inter_600SemiBold", color: C.textSecondary,
-    letterSpacing: 0.3, textTransform: "uppercase", marginBottom: 12,
+    letterSpacing: 0.3, marginBottom: 8, textTransform: "uppercase",
   },
   textRTL: { textAlign: "right" },
-  itemsCard: {
+  companySelector: {
+    backgroundColor: C.card, borderRadius: 14, padding: 16,
+    borderWidth: 1.5, borderColor: C.border, marginBottom: 20,
+    borderStyle: "dashed",
+  },
+  companySelectorFilled: {
+    borderStyle: "solid", borderColor: "#7C3AED",
+    backgroundColor: "#F5F3FF",
+  },
+  companySelectorInner: { flexDirection: "row", alignItems: "center", gap: 10 },
+  companySelectorIcon: {
+    width: 32, height: 32, borderRadius: 10, backgroundColor: "#EDE9FE",
+    justifyContent: "center", alignItems: "center",
+  },
+  companySelectorName: { flex: 1, fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#5B21B6" },
+  companySelectorChange: { fontSize: 13, fontFamily: "Inter_500Medium", color: C.danger },
+  companySelectorPlaceholder: { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular", color: C.textMuted },
+  sectionHeader: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12,
+  },
+  sectionHeaderRTL: { flexDirection: "row-reverse" },
+  addProductBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    backgroundColor: C.dangerLight, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
+  },
+  addProductBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: C.danger },
+  emptyCart: {
+    backgroundColor: C.card, borderRadius: 16, padding: 40, alignItems: "center",
+    gap: 10, borderWidth: 2, borderColor: C.border, borderStyle: "dashed",
+  },
+  emptyCartText: { fontSize: 14, fontFamily: "Inter_400Regular", color: C.textMuted },
+  cartCard: {
     backgroundColor: C.card, borderRadius: 16, overflow: "hidden",
     shadowColor: C.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 6, elevation: 2,
   },
-  itemRow: {
-    flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, gap: 12,
-  },
-  itemRowRTL: { flexDirection: "row-reverse" },
-  itemInfo: { flex: 1 },
-  itemName: { fontSize: 15, fontFamily: "Inter_500Medium", color: C.text },
-  itemSold: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textSecondary, marginTop: 2 },
-  itemPrice: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.tint, marginTop: 1 },
-  qtyInput: {
-    width: 64, backgroundColor: C.borderLight, borderRadius: 10, padding: 10,
-    fontSize: 16, fontFamily: "Inter_600SemiBold", color: C.text, textAlign: "center",
-    borderWidth: 1, borderColor: C.border,
-  },
-  qtyInputDisabled: { opacity: 0.4 },
+  cartRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 16, gap: 12 },
+  cartInfo: { flex: 1 },
+  cartName: { fontSize: 14, fontFamily: "Inter_500Medium", color: C.text },
+  cartPrice: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textMuted, marginTop: 2 },
+  qtyControl: { flexDirection: "row", alignItems: "center", backgroundColor: C.dangerLight, borderRadius: 10 },
+  qtyBtn: { width: 32, height: 32, justifyContent: "center", alignItems: "center" },
+  qtyText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: C.text, minWidth: 24, textAlign: "center" },
+  cartLineTotal: { fontSize: 14, fontFamily: "Inter_700Bold", color: C.danger, minWidth: 80, textAlign: "right" },
   totalRow: {
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
     paddingVertical: 14, paddingHorizontal: 16, backgroundColor: C.dangerLight,
   },
-  totalRowRTL: { flexDirection: "row-reverse" },
   totalLabel: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: C.text },
   totalValue: { fontSize: 18, fontFamily: "Inter_700Bold", color: C.danger },
   sep: { height: 1, backgroundColor: C.borderLight },
@@ -295,22 +382,24 @@ const styles = StyleSheet.create({
   saveBtnDisabled: { opacity: 0.5 },
   saveBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
   pickerHeader: {
+    flexDirection: "row", justifyContent: "space-between", alignItems: "center",
     padding: 20, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.card,
   },
   pickerTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: C.text },
-  invPickerItem: {
-    flexDirection: "row", alignItems: "center", backgroundColor: C.card,
-    borderRadius: 14, padding: 16, gap: 12,
+  pickerItem: {
+    flexDirection: "row", alignItems: "center", backgroundColor: C.card, borderRadius: 14, padding: 16, gap: 12,
   },
-  invPickerItemRTL: { flexDirection: "row-reverse" },
-  invPickerItemPressed: { opacity: 0.85 },
-  invPickerLeft: { flex: 1 },
-  invPickerNum: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: C.text },
-  invPickerCompany: { fontSize: 12, fontFamily: "Inter_500Medium", color: "#7C3AED", marginTop: 2 },
-  invPickerCustomer: { fontSize: 13, fontFamily: "Inter_400Regular", color: C.textSecondary, marginTop: 2 },
-  invPickerDate: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textMuted, marginTop: 1 },
-  invPickerTotal: { fontSize: 15, fontFamily: "Inter_700Bold", color: C.tint },
-  emptyPicker: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
-  emptyPickerText: { fontSize: 17, fontFamily: "Inter_600SemiBold", color: C.text },
-  emptyPickerSub: { fontSize: 14, fontFamily: "Inter_400Regular", color: C.textSecondary },
+  pickerItemPressed: { opacity: 0.85 },
+  pickerItemIcon: {
+    width: 36, height: 36, borderRadius: 10, backgroundColor: "#EDE9FE",
+    justifyContent: "center", alignItems: "center",
+  },
+  pickerItemInfo: { flex: 1 },
+  pickerItemName: { fontSize: 15, fontFamily: "Inter_500Medium", color: C.text },
+  pickerItemSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textMuted, marginTop: 2 },
+  pickerItemPrice: { fontSize: 13, fontFamily: "Inter_400Regular", color: C.danger, marginTop: 2 },
+  emptyPicker: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
+  emptyPickerText: { fontSize: 16, fontFamily: "Inter_400Regular", color: C.textSecondary },
+  goToBtn: { backgroundColor: C.danger, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
+  goToBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });

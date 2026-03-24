@@ -53,7 +53,7 @@ export default function InvoiceDetailScreen() {
   };
 
   const handleCreateReturn = () => {
-    router.push({ pathname: "/return/create", params: { invoiceId: id } });
+    router.push({ pathname: "/return/create", params: { companyId: inv.companyId } });
   };
 
   const handleEdit = () => {
