@@ -61,10 +61,13 @@ export default function ProductsScreen() {
   };
 
   const handleDelete = (product: Product) => {
-    Alert.alert(
-      t("deleteProduct"),
-      `${t("deleteProductConfirm")} "${product.name}"?`,
-      [
+    const message = `${t("deleteProductConfirm")} "${product.name}"?`;
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.confirm(message)) {
+        deleteProduct(product.id);
+      }
+    } else {
+      Alert.alert(t("deleteProduct"), message, [
         { text: t("cancel"), style: "cancel" },
         {
           text: t("delete"),
@@ -74,8 +77,8 @@ export default function ProductsScreen() {
             deleteProduct(product.id);
           },
         },
-      ]
-    );
+      ]);
+    }
   };
 
   if (mode === "add" || mode === "edit") {

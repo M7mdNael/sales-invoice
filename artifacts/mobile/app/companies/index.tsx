@@ -67,17 +67,23 @@ export default function CompaniesScreen() {
       ? `${t("deleteCompanyConfirm")} "${company.name}"? This company has ${invoiceCount} invoice(s).`
       : `${t("deleteCompanyConfirm")} "${company.name}"?`;
 
-    Alert.alert(t("deleteCompany"), message, [
-      { text: t("cancel"), style: "cancel" },
-      {
-        text: t("delete"),
-        style: "destructive",
-        onPress: () => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          deleteCompany(company.id);
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.confirm(message)) {
+        deleteCompany(company.id);
+      }
+    } else {
+      Alert.alert(t("deleteCompany"), message, [
+        { text: t("cancel"), style: "cancel" },
+        {
+          text: t("delete"),
+          style: "destructive",
+          onPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            deleteCompany(company.id);
+          },
         },
-      },
-    ]);
+      ]);
+    }
   };
 
   if (mode === "add" || mode === "edit") {
