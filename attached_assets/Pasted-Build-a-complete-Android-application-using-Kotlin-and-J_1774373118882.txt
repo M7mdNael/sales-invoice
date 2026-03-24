@@ -1,0 +1,75 @@
+Build a complete Android application using Kotlin and Jetpack Compose. The app is a simple offline Sales and Sales Return invoicing system for one company. The project must be fully structured, production-ready, and ready to open in Android Studio and generate an APK.
+Technical Requirements:
+Language: Kotlin
+UI: Jetpack Compose
+Database: Room (local only, no internet)
+Architecture: MVVM
+No APIs, no authentication, no cloud
+Core Features:
+Product Management
+Add, edit, delete products
+Fields: name, price
+Sales Invoice
+Create new invoice
+Add customer name (required field)
+Add multiple products with quantity
+Automatically calculate total (price × quantity)
+Currency must be JOD (Jordanian Dinar)
+Format all prices like: 10.00 JOD
+Auto generate invoice number (INV-0001, INV-0002...)
+Save invoice locally
+Sales Return (Return Invoice)
+Select an existing invoice
+Display its items
+Input returned quantities (must not exceed sold quantity)
+Create return invoice linked to original invoice
+Auto generate return number (RET-0001...)
+Calculate return total in JOD
+Invoice List
+Display all sales invoices
+Display all return invoices
+Show customer name in list
+View invoice details
+Reports Screen
+Total Sales (JOD)
+Total Returns (JOD)
+Net = Sales − Returns (JOD)
+PDF Export & Share (VERY IMPORTANT)
+Generate a PDF invoice
+PDF must include:
+Invoice number
+Customer name
+Date
+List of products (name, quantity, price)
+Total in JOD
+Save PDF locally
+Add button to share PDF using Android share intent
+Database Schema:
+Product(id, name, price)
+SalesInvoice(id, invoice_number, customer_name, date, total)
+SalesInvoiceItem(id, invoice_id, product_id, quantity, price)
+ReturnInvoice(id, return_number, original_invoice_id, date, total)
+ReturnItem(id, return_id, product_id, quantity, price)
+Business Logic Rules:
+Prevent returning more than sold quantity
+Return must always be linked to an existing invoice
+All totals calculated automatically
+Currency fixed to JOD
+Data stored locally only
+UI Screens:
+Home Screen (New Invoice / Returns / Reports)
+Products Screen
+Create Invoice Screen (with customer name input)
+Create Return Screen
+Invoices List Screen
+Invoice Details Screen
+Reports Screen
+Extra Requirements:
+Clean modern UI
+Simple navigation
+Proper state management (ViewModel)
+FileProvider setup for PDF sharing
+Runtime permissions handled if needed
+Provide full project structure
+Provide step-by-step instructions to build APK in Android Studio
+Return full working Android Studio project code, no placeholders, all features implemented.
