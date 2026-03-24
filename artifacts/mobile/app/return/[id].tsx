@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons, Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -24,7 +24,7 @@ const C = Colors.light;
 
 export default function ReturnDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { returnInvoices } = useApp();
+  const { returnInvoices, deleteReturnInvoice } = useApp();
   const { t, isRTL } = useLang();
   const [sharing, setSharing] = useState(false);
   const insets = useSafeAreaInsets();
@@ -52,6 +52,25 @@ export default function ReturnDetailScreen() {
     }
   };
 
+  const handleDelete = () => {
+    Alert.alert(
+      t("deleteReturn"),
+      `${t("deleteReturnConfirm")} ${ret.returnNumber}?`,
+      [
+        { text: t("cancel"), style: "cancel" },
+        {
+          text: t("delete"),
+          style: "destructive",
+          onPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            deleteReturnInvoice(ret.id);
+            router.dismissAll();
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -64,8 +83,13 @@ export default function ReturnDetailScreen() {
               <MaterialCommunityIcons name="undo-variant" size={14} color={C.danger} />
               <Text style={styles.invBadgeText}>{ret.returnNumber}</Text>
             </View>
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusText}>{t("return")}</Text>
+            <View style={styles.invHeaderRight}>
+              <View style={styles.statusBadge}>
+                <Text style={styles.statusText}>{t("return")}</Text>
+              </View>
+              <Pressable style={styles.deleteIconBtn} onPress={handleDelete}>
+                <Feather name="trash-2" size={16} color={C.danger} />
+              </Pressable>
             </View>
           </View>
 
@@ -140,6 +164,11 @@ const styles = StyleSheet.create({
   },
   invHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   invHeaderRTL: { flexDirection: "row-reverse" },
+  invHeaderRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  deleteIconBtn: {
+    width: 34, height: 34, borderRadius: 10, backgroundColor: C.dangerLight,
+    justifyContent: "center", alignItems: "center",
+  },
   invBadge: {
     flexDirection: "row", alignItems: "center", gap: 5,
     backgroundColor: C.dangerLight, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20,

@@ -87,6 +87,8 @@ interface AppContextValue {
     originalInvoice: SalesInvoice,
     items: Omit<ReturnItem, "id">[]
   ) => ReturnInvoice;
+  deleteSalesInvoice: (id: string) => void;
+  deleteReturnInvoice: (id: string) => void;
   getNextInvoiceNumber: () => string;
   getNextReturnNumber: () => string;
 }
@@ -332,6 +334,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [returnCounter, returnInvoices, saveReturnInvoices]
   );
 
+  const deleteSalesInvoice = useCallback(
+    (id: string) => {
+      const updated = salesInvoices.filter((inv) => inv.id !== id);
+      setSalesInvoices(updated);
+      saveSalesInvoices(updated);
+    },
+    [salesInvoices, saveSalesInvoices]
+  );
+
+  const deleteReturnInvoice = useCallback(
+    (id: string) => {
+      const updated = returnInvoices.filter((r) => r.id !== id);
+      setReturnInvoices(updated);
+      saveReturnInvoices(updated);
+    },
+    [returnInvoices, saveReturnInvoices]
+  );
+
   const value = useMemo(
     () => ({
       companies,
@@ -348,6 +368,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addSalesInvoice,
       updateSalesInvoice,
       addReturnInvoice,
+      deleteSalesInvoice,
+      deleteReturnInvoice,
       getNextInvoiceNumber,
       getNextReturnNumber,
     }),
@@ -366,6 +388,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addSalesInvoice,
       updateSalesInvoice,
       addReturnInvoice,
+      deleteSalesInvoice,
+      deleteReturnInvoice,
       getNextInvoiceNumber,
       getNextReturnNumber,
     ]

@@ -24,7 +24,7 @@ const C = Colors.light;
 
 export default function InvoiceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { salesInvoices } = useApp();
+  const { salesInvoices, deleteSalesInvoice } = useApp();
   const { t, isRTL } = useLang();
   const [sharing, setSharing] = useState(false);
   const insets = useSafeAreaInsets();
@@ -60,6 +60,25 @@ export default function InvoiceDetailScreen() {
     router.push({ pathname: "/invoice/create", params: { editId: id } });
   };
 
+  const handleDelete = () => {
+    Alert.alert(
+      t("deleteInvoice"),
+      `${t("deleteInvoiceConfirm")} ${invoice.invoiceNumber}?`,
+      [
+        { text: t("cancel"), style: "cancel" },
+        {
+          text: t("delete"),
+          style: "destructive",
+          onPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            deleteSalesInvoice(invoice.id);
+            router.dismissAll();
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -71,8 +90,13 @@ export default function InvoiceDetailScreen() {
             <View style={styles.invBadge}>
               <Text style={styles.invBadgeText}>{invoice.invoiceNumber}</Text>
             </View>
-            <View style={[styles.statusBadge, { backgroundColor: C.successLight }]}>
-              <Text style={[styles.statusText, { color: C.success }]}>{t("completed")}</Text>
+            <View style={styles.invHeaderRight}>
+              <View style={[styles.statusBadge, { backgroundColor: C.successLight }]}>
+                <Text style={[styles.statusText, { color: C.success }]}>{t("completed")}</Text>
+              </View>
+              <Pressable style={styles.deleteIconBtn} onPress={handleDelete}>
+                <Feather name="trash-2" size={16} color={C.danger} />
+              </Pressable>
             </View>
           </View>
 
@@ -144,6 +168,11 @@ const styles = StyleSheet.create({
     flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12,
   },
   invHeaderRTL: { flexDirection: "row-reverse" },
+  invHeaderRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  deleteIconBtn: {
+    width: 34, height: 34, borderRadius: 10, backgroundColor: C.dangerLight,
+    justifyContent: "center", alignItems: "center",
+  },
   invBadge: { backgroundColor: C.tintLight, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
   invBadgeText: { fontSize: 14, fontFamily: "Inter_700Bold", color: C.tint },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
