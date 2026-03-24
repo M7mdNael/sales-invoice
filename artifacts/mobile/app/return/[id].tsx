@@ -25,7 +25,7 @@ const C = Colors.light;
 export default function ReturnDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { returnInvoices, deleteReturnInvoice } = useApp();
-  const { t, isRTL } = useLang();
+  const { t, isRTL, lang } = useLang();
   const [sharing, setSharing] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const insets = useSafeAreaInsets();
@@ -45,7 +45,7 @@ export default function ReturnDetailScreen() {
     setSharing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      await generateAndShareReturnPDF(ret);
+      await generateAndShareReturnPDF(ret, lang);
     } catch (e) {
       Alert.alert(t("error"), t("errorPDF"));
     } finally {
@@ -57,7 +57,7 @@ export default function ReturnDetailScreen() {
     setDownloading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      await downloadReturnPDF(ret);
+      await downloadReturnPDF(ret, lang);
     } catch (e) {
       Alert.alert(t("error"), t("errorPDF"));
     } finally {
