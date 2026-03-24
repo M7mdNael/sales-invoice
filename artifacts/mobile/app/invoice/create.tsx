@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   Alert,
   FlatList,
@@ -10,7 +10,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -43,7 +42,6 @@ export default function CreateInvoiceScreen() {
   const isEditing = !!params.editId;
   const existingInvoice = isEditing ? salesInvoices.find((inv) => inv.id === params.editId) : null;
 
-  const [customerName, setCustomerName] = useState(existingInvoice?.customerName ?? "");
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(
     existingInvoice?.companyId
       ? (companies.find((c) => c.id === existingInvoice.companyId) ?? null)
@@ -105,11 +103,11 @@ export default function CreateInvoiceScreen() {
       price: c.product.price,
     }));
     if (isEditing && existingInvoice) {
-      const invoice = updateSalesInvoice(existingInvoice.id, selectedCompany, customerName.trim(), items);
+      const invoice = updateSalesInvoice(existingInvoice.id, selectedCompany, selectedCompany.name, items);
       router.dismissAll();
       router.push(`/invoice/${invoice.id}`);
     } else {
-      const invoice = addSalesInvoice(selectedCompany, customerName.trim(), items);
+      const invoice = addSalesInvoice(selectedCompany, selectedCompany.name, items);
       router.dismissAll();
       router.push(`/invoice/${invoice.id}`);
     }
@@ -257,17 +255,6 @@ export default function CreateInvoiceScreen() {
             </View>
           )}
         </Pressable>
-
-        <Text style={[styles.fieldLabel, isRTL && styles.textRTL]}>{t("customerName")}</Text>
-        <TextInput
-          style={[styles.input, isRTL && styles.inputRTL]}
-          placeholder={t("customerName")}
-          placeholderTextColor={C.textMuted}
-          value={customerName}
-          onChangeText={setCustomerName}
-          returnKeyType="done"
-          textAlign={isRTL ? "right" : "left"}
-        />
 
         <View style={[styles.sectionHeader, isRTL && styles.sectionHeaderRTL]}>
           <Text style={[styles.fieldLabel, isRTL && styles.textRTL, { marginBottom: 0 }]}>{t("products")}</Text>

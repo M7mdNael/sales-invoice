@@ -76,16 +76,7 @@ export default function InvoiceDetailScreen() {
             </View>
           </View>
 
-          {invoice.companyName ? (
-            <View style={[styles.companyRow, isRTL && styles.companyRowRTL]}>
-              <View style={styles.companyIcon}>
-                <Feather name="briefcase" size={14} color="#7C3AED" />
-              </View>
-              <Text style={styles.companyName}>{invoice.companyName}</Text>
-            </View>
-          ) : null}
-
-          <Text style={[styles.customer, isRTL && styles.textRTL]}>{invoice.customerName || "—"}</Text>
+          <Text style={[styles.customer, isRTL && styles.textRTL]}>{invoice.companyName || invoice.customerName || "—"}</Text>
           <Text style={[styles.dateText, isRTL && styles.textRTL]}>{formatDate(invoice.date)}</Text>
         </View>
 
