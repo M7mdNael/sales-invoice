@@ -46,6 +46,7 @@ export default function OnboardingScreen() {
   const [code, setCode] = useState("");
   const [codeError, setCodeError] = useState("");
   const [verifying, setVerifying] = useState(false);
+  const [devCode, setDevCode] = useState<string | null>(null);
 
   const [phone, setPhone] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -85,6 +86,12 @@ export default function OnboardingScreen() {
       if (!res.ok) throw new Error(data.error ?? "Failed to send code.");
       setCodeSent(true);
       setResendCooldown(60);
+      if (data.devMode && data.devCode) {
+        setDevCode(data.devCode);
+        setCode(data.devCode);
+      } else {
+        setDevCode(null);
+      }
       setStep("verify");
       setTimeout(() => codeRef.current?.focus(), 400);
     } catch (err: any) {
@@ -256,6 +263,22 @@ export default function OnboardingScreen() {
               We sent a 6-digit code to{"\n"}
               <Text style={styles.emailHighlight}>{email}</Text>
             </Text>
+
+            {!!devCode && (
+              <View style={styles.devBanner}>
+                <Feather name="alert-circle" size={15} color="#92400E" />
+                <View style={styles.devBannerText}>
+                  <Text style={styles.devBannerTitle}>Test Mode — No domain verified</Text>
+                  <Text style={styles.devBannerDesc}>
+                    Email wasn't sent. Your code is:{" "}
+                    <Text style={styles.devBannerCode}>{devCode}</Text>
+                  </Text>
+                  <Text style={styles.devBannerHint}>
+                    Verify a domain at resend.com/domains to send real emails.
+                  </Text>
+                </View>
+              </View>
+            )}
 
             <Text style={styles.fieldLabel}>VERIFICATION CODE *</Text>
             <View style={[styles.codeInputRow, !!codeError && styles.iconRowError]}>
@@ -475,6 +498,17 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.5 },
   btnText: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#fff" },
+
+  devBanner: {
+    flexDirection: "row", alignItems: "flex-start", gap: 10,
+    backgroundColor: "#FFFBEB", borderRadius: 12, borderWidth: 1, borderColor: "#FCD34D",
+    padding: 12, marginBottom: 16,
+  },
+  devBannerText: { flex: 1 },
+  devBannerTitle: { fontSize: 12, fontFamily: "Inter_700Bold", color: "#92400E", marginBottom: 3 },
+  devBannerDesc: { fontSize: 13, fontFamily: "Inter_400Regular", color: "#78350F", lineHeight: 18 },
+  devBannerCode: { fontFamily: "Inter_700Bold", fontSize: 15, letterSpacing: 3, color: "#92400E" },
+  devBannerHint: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#B45309", marginTop: 4 },
 
   resendRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 16 },
   resendLabel: { fontSize: 13, fontFamily: "Inter_400Regular", color: C.textSecondary },
