@@ -93,6 +93,11 @@ interface AppContextValue {
     company: Company,
     items: Omit<ReturnItem, "id">[]
   ) => ReturnInvoice;
+  updateReturnInvoice: (
+    id: string,
+    company: Company,
+    items: Omit<ReturnItem, "id">[]
+  ) => ReturnInvoice;
   deleteSalesInvoice: (id: string) => void;
   deleteReturnInvoice: (id: string) => void;
   restoreSalesInvoice: (id: string) => void;
@@ -336,6 +341,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [salesInvoices, saveSalesInvoices]
   );
 
+  const updateReturnInvoice = useCallback(
+    (id: string, company: Company, items: Omit<ReturnItem, "id">[]) => {
+      const existing = returnInvoices.find((r) => r.id === id);
+      if (!existing) throw new Error("Return not found");
+      const updated_return: ReturnInvoice = {
+        ...existing,
+        companyId: company.id,
+        companyName: company.name,
+        items: items.map((item) => ({ ...item, id: generateId() })),
+        total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+      };
+      const updated = returnInvoices.map((r) => r.id === id ? updated_return : r);
+      setReturnInvoices(updated);
+      saveReturnInvoices(updated);
+      return updated_return;
+    },
+    [returnInvoices, saveReturnInvoices]
+  );
+
   const addReturnInvoice = useCallback(
     (originalInvoice: SalesInvoice, items: Omit<ReturnItem, "id">[]) => {
       const next = returnCounter + 1;
@@ -486,6 +510,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateSalesInvoice,
       addReturnInvoice,
       addStandaloneReturn,
+      updateReturnInvoice,
       deleteSalesInvoice,
       deleteReturnInvoice,
       restoreSalesInvoice,
@@ -514,6 +539,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateSalesInvoice,
       addReturnInvoice,
       addStandaloneReturn,
+      updateReturnInvoice,
       deleteSalesInvoice,
       deleteReturnInvoice,
       restoreSalesInvoice,

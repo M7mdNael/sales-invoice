@@ -65,6 +65,10 @@ export default function ReturnDetailScreen() {
     }
   };
 
+  const handleEdit = () => {
+    router.push({ pathname: "/return/create", params: { editId: id } });
+  };
+
   const handleDelete = () => {
     const msg = `${t("deleteReturnConfirm")} ${ret.returnNumber}?`;
     if (Platform.OS === "web") {
@@ -158,26 +162,32 @@ export default function ReturnDetailScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: bottomPad }]}>
-        <Pressable style={styles.downloadBtn} onPress={handleDownload} disabled={downloading}>
-          {downloading ? (
-            <ActivityIndicator color={C.danger} size="small" />
-          ) : (
-            <>
-              <Feather name="download" size={16} color={C.danger} />
-              <Text style={styles.downloadBtnText}>{t("downloadPDF")}</Text>
-            </>
-          )}
+        <Pressable style={styles.editBtn} onPress={handleEdit}>
+          <Feather name="edit-2" size={16} color={C.danger} />
+          <Text style={styles.editBtnText}>{t("edit")}</Text>
         </Pressable>
-        <Pressable style={styles.shareBtn} onPress={handleShare} disabled={sharing}>
-          {sharing ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <>
-              <Feather name="share" size={16} color="#fff" />
-              <Text style={styles.shareBtnText}>{t("sharePDF")}</Text>
-            </>
-          )}
-        </Pressable>
+        <View style={styles.footerRow}>
+          <Pressable style={styles.downloadBtn} onPress={handleDownload} disabled={downloading}>
+            {downloading ? (
+              <ActivityIndicator color={C.danger} size="small" />
+            ) : (
+              <>
+                <Feather name="download" size={16} color={C.danger} />
+                <Text style={styles.downloadBtnText}>{t("downloadPDF")}</Text>
+              </>
+            )}
+          </Pressable>
+          <Pressable style={styles.shareBtn} onPress={handleShare} disabled={sharing}>
+            {sharing ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Feather name="share" size={16} color="#fff" />
+                <Text style={styles.shareBtnText}>{t("sharePDF")}</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -247,9 +257,16 @@ const styles = StyleSheet.create({
   grandTotalLabel: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: C.text },
   grandTotalValue: { fontSize: 18, fontFamily: "Inter_700Bold", color: C.danger },
   footer: {
-    flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingTop: 12,
+    flexDirection: "column", gap: 8, paddingHorizontal: 16, paddingTop: 12,
     backgroundColor: C.backgroundSecondary, borderTopWidth: 1, borderTopColor: C.border,
   },
+  footerRow: { flexDirection: "row", gap: 8 },
+  editBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: C.dangerLight, borderRadius: 14, paddingVertical: 14,
+    borderWidth: 1.5, borderColor: C.danger,
+  },
+  editBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: C.danger },
   downloadBtn: {
     flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
     backgroundColor: C.dangerLight, borderRadius: 14, paddingVertical: 14,

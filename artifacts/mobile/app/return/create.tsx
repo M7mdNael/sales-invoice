@@ -30,18 +30,35 @@ type CurrentView = "form" | "productPicker" | "companyPicker";
 
 export default function CreateReturnScreen() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ companyId?: string }>();
-  const { products, companies, addStandaloneReturn, getNextReturnNumber } = useApp();
+  const params = useLocalSearchParams<{ companyId?: string; editId?: string }>();
+  const { products, companies, returnInvoices, addStandaloneReturn, updateReturnInvoice, getNextReturnNumber } = useApp();
   const { t, isRTL } = useLang();
 
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(
-    params.companyId ? (companies.find((c) => c.id === params.companyId) ?? null) : null
-  );
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const isEditing = !!params.editId;
+  const existingReturn = isEditing ? returnInvoices.find((r) => r.id === params.editId) : null;
+
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(() => {
+    if (existingReturn?.companyId) return companies.find((c) => c.id === existingReturn.companyId) ?? null;
+    if (params.companyId) return companies.find((c) => c.id === params.companyId) ?? null;
+    return null;
+  });
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    if (existingReturn) {
+      return existingReturn.items.map((item) => {
+        const product = products.find((p) => p.id === item.productId) ?? {
+          id: item.productId,
+          name: item.productName,
+          price: item.price,
+        };
+        return { product, quantity: item.quantity };
+      });
+    }
+    return [];
+  });
   const [currentView, setCurrentView] = useState<CurrentView>("form");
   const [saving, setSaving] = useState(false);
 
-  const returnNumber = getNextReturnNumber();
+  const returnNumber = isEditing ? existingReturn?.returnNumber : getNextReturnNumber();
   const total = cart.reduce((s, c) => s + c.product.price * c.quantity, 0);
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom + 16;
 
@@ -81,9 +98,15 @@ export default function CreateReturnScreen() {
       quantity: c.quantity,
       price: c.product.price,
     }));
-    const ret = addStandaloneReturn(selectedCompany, items);
-    router.dismissAll();
-    router.push(`/return/${ret.id}`);
+    if (isEditing && existingReturn) {
+      const ret = updateReturnInvoice(existingReturn.id, selectedCompany, items);
+      router.dismissAll();
+      router.push(`/return/${ret.id}`);
+    } else {
+      const ret = addStandaloneReturn(selectedCompany, items);
+      router.dismissAll();
+      router.push(`/return/${ret.id}`);
+    }
   };
 
   if (currentView === "companyPicker") {
@@ -198,6 +221,11 @@ export default function CreateReturnScreen() {
         <View style={styles.returnNumBadge}>
           <MaterialCommunityIcons name="undo-variant" size={14} color={C.danger} />
           <Text style={styles.returnNumText}>{returnNumber}</Text>
+          {isEditing && (
+            <View style={styles.editBadge}>
+              <Text style={styles.editBadgeText}>{t("editReturn")}</Text>
+            </View>
+          )}
         </View>
 
         <Text style={[styles.fieldLabel, isRTL && styles.textRTL]}>{t("company")} *</Text>
@@ -260,7 +288,7 @@ export default function CreateReturnScreen() {
           disabled={saving || cart.length === 0}
         >
           <Feather name="check" size={18} color="#fff" />
-          <Text style={styles.saveBtnText}>{t("createReturnBtn")}</Text>
+          <Text style={styles.saveBtnText}>{isEditing ? t("saveChanges") : t("createReturnBtn")}</Text>
         </Pressable>
       </View>
     </View>
@@ -316,6 +344,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 20,
   },
   returnNumText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: C.danger },
+  editBadge: {
+    backgroundColor: "#FEF3CD", paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: 10, marginLeft: 4,
+  },
+  editBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#92400E" },
   fieldLabel: {
     fontSize: 13, fontFamily: "Inter_600SemiBold", color: C.textSecondary,
     letterSpacing: 0.3, marginBottom: 8, textTransform: "uppercase",
