@@ -16,6 +16,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppProvider } from "@/context/AppContext";
 import { LanguageProvider } from "@/context/LanguageContext";
+import { UserProvider, useUser } from "@/context/UserContext";
+import OnboardingScreen from "./onboarding";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -78,6 +80,13 @@ function RootLayoutNav() {
   );
 }
 
+function AppGate() {
+  const { user, isLoading } = useUser();
+  if (isLoading) return null;
+  if (!user) return <OnboardingScreen />;
+  return <RootLayoutNav />;
+}
+
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
@@ -99,13 +108,15 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <LanguageProvider>
-            <AppProvider>
-              <GestureHandlerRootView>
-                <KeyboardProvider>
-                  <RootLayoutNav />
-                </KeyboardProvider>
-              </GestureHandlerRootView>
-            </AppProvider>
+            <UserProvider>
+              <AppProvider>
+                <GestureHandlerRootView>
+                  <KeyboardProvider>
+                    <AppGate />
+                  </KeyboardProvider>
+                </GestureHandlerRootView>
+              </AppProvider>
+            </UserProvider>
           </LanguageProvider>
         </QueryClientProvider>
       </ErrorBoundary>

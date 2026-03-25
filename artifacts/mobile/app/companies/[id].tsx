@@ -2,11 +2,13 @@ import { MaterialCommunityIcons, Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
+  Alert,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,21 +16,58 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { SalesInvoice, ReturnInvoice, useApp } from "@/context/AppContext";
 import { useLang } from "@/context/LanguageContext";
+import { useUser } from "@/context/UserContext";
 import { formatCurrency, formatDate } from "@/utils/format";
 
 const C = Colors.light;
 
-type Tab = "invoices" | "returns";
+type Tab = "invoices" | "returns" | "members";
 
 export default function CompanyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { companies, salesInvoices, returnInvoices } = useApp();
+  const { companies, salesInvoices, returnInvoices, inviteMember, removeMember } = useApp();
   const { t, isRTL } = useLang();
+  const { user } = useUser();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<Tab>("invoices");
+  const [invitePhone, setInvitePhone] = useState("");
+  const [inviting, setInviting] = useState(false);
 
   const company = companies.find((c) => c.id === id);
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom + 16;
+  const isOwner = company?.ownerId === user?.phone;
+
+  const handleInvite = () => {
+    const phone = invitePhone.trim().replace(/\s+/g, "");
+    if (!phone) return;
+    if (phone === user?.phone) {
+      Alert.alert("Invalid", "You cannot invite yourself.");
+      return;
+    }
+    if (company?.members.includes(phone)) {
+      Alert.alert("Already a member", `${phone} is already in this company.`);
+      return;
+    }
+    setInviting(true);
+    inviteMember(id!, phone);
+    setInvitePhone("");
+    setInviting(false);
+    Alert.alert("Member Added", `${phone} has been added to ${company?.name}.`);
+  };
+
+  const handleRemoveMember = (phone: string) => {
+    const msg = `Remove ${phone} from this company?`;
+    if (Platform.OS === "web") {
+      if (typeof window !== "undefined" && window.confirm(msg)) {
+        removeMember(id!, phone);
+      }
+    } else {
+      Alert.alert("Remove Member", msg, [
+        { text: "Cancel", style: "cancel" },
+        { text: "Remove", style: "destructive", onPress: () => removeMember(id!, phone) },
+      ]);
+    }
+  };
 
   if (!company) {
     return (
@@ -107,12 +146,7 @@ export default function CompanyDetailScreen() {
               size={16}
               color={activeTab === "invoices" ? C.tint : C.textMuted}
             />
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === "invoices" && styles.tabTextActive,
-              ]}
-            >
+            <Text style={[styles.tabText, activeTab === "invoices" && styles.tabTextActive]}>
               {t("invoices")} ({companyInvoices.length})
             </Text>
           </Pressable>
@@ -125,13 +159,21 @@ export default function CompanyDetailScreen() {
               size={16}
               color={activeTab === "returns" ? C.danger : C.textMuted}
             />
-            <Text
-              style={[
-                styles.tabText,
-                activeTab === "returns" && styles.tabTextRed,
-              ]}
-            >
+            <Text style={[styles.tabText, activeTab === "returns" && styles.tabTextRed]}>
               {t("returns")} ({companyReturns.length})
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.tab, activeTab === "members" && styles.tabActiveMembers]}
+            onPress={() => setActiveTab("members")}
+          >
+            <Feather
+              name="users"
+              size={16}
+              color={activeTab === "members" ? "#7C3AED" : C.textMuted}
+            />
+            <Text style={[styles.tabText, activeTab === "members" && styles.tabTextMembers]}>
+              Members ({company.members.length})
             </Text>
           </Pressable>
         </View>
@@ -150,26 +192,89 @@ export default function CompanyDetailScreen() {
               />
             ) : (
               companyInvoices.map((inv) => (
-                <InvoiceRow
-                  key={inv.id}
-                  invoice={inv}
-                  isRTL={isRTL}
-                />
+                <InvoiceRow key={inv.id} invoice={inv} isRTL={isRTL} />
               ))
             )
-          ) : companyReturns.length === 0 ? (
-            <EmptyState
-              icon="rotate-ccw"
-              message={t("noReturnsForCompany")}
-              color={C.danger}
-              bg={C.dangerLight}
-              onAdd={() => router.push({ pathname: "/return/create", params: { companyId: id } })}
-              addLabel={t("newReturn")}
-            />
+          ) : activeTab === "returns" ? (
+            companyReturns.length === 0 ? (
+              <EmptyState
+                icon="rotate-ccw"
+                message={t("noReturnsForCompany")}
+                color={C.danger}
+                bg={C.dangerLight}
+                onAdd={() => router.push({ pathname: "/return/create", params: { companyId: id } })}
+                addLabel={t("newReturn")}
+              />
+            ) : (
+              companyReturns.map((ret) => (
+                <ReturnRow key={ret.id} ret={ret} isRTL={isRTL} />
+              ))
+            )
           ) : (
-            companyReturns.map((ret) => (
-              <ReturnRow key={ret.id} ret={ret} isRTL={isRTL} />
-            ))
+            <View>
+              {isOwner && (
+                <View style={styles.inviteCard}>
+                  <Text style={styles.inviteTitle}>Invite by Phone Number</Text>
+                  <Text style={styles.inviteHint}>
+                    Enter the phone number of the person you want to add to this company.
+                  </Text>
+                  <View style={styles.inviteRow}>
+                    <TextInput
+                      style={styles.inviteInput}
+                      placeholder="e.g. 0787257541"
+                      placeholderTextColor={C.textMuted}
+                      value={invitePhone}
+                      onChangeText={setInvitePhone}
+                      keyboardType="phone-pad"
+                      returnKeyType="done"
+                      onSubmitEditing={handleInvite}
+                    />
+                    <Pressable
+                      style={[styles.inviteBtn, !invitePhone.trim() && styles.inviteBtnDisabled]}
+                      onPress={handleInvite}
+                      disabled={!invitePhone.trim() || inviting}
+                    >
+                      <Feather name="user-plus" size={16} color="#fff" />
+                      <Text style={styles.inviteBtnText}>Add</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+
+              {company.members.length === 0 ? (
+                <View style={styles.empty}>
+                  <View style={[styles.emptyIcon, { backgroundColor: "#EDE9FE" }]}>
+                    <Feather name="users" size={32} color="#7C3AED" />
+                  </View>
+                  <Text style={styles.emptyText}>No members yet</Text>
+                </View>
+              ) : (
+                company.members.map((phone) => (
+                  <View key={phone} style={styles.memberRow}>
+                    <View style={styles.memberAvatar}>
+                      <Feather name="user" size={18} color="#7C3AED" />
+                    </View>
+                    <View style={styles.memberInfo}>
+                      <Text style={styles.memberPhone}>{phone}</Text>
+                      {phone === company.ownerId && (
+                        <Text style={styles.memberRole}>Owner</Text>
+                      )}
+                      {phone === user?.phone && phone !== company.ownerId && (
+                        <Text style={[styles.memberRole, { color: C.tint }]}>You</Text>
+                      )}
+                    </View>
+                    {isOwner && phone !== company.ownerId && (
+                      <Pressable
+                        style={styles.removeBtn}
+                        onPress={() => handleRemoveMember(phone)}
+                      >
+                        <Feather name="x" size={16} color={C.danger} />
+                      </Pressable>
+                    )}
+                  </View>
+                ))
+              )}
+            </View>
           )}
         </View>
       </ScrollView>
@@ -377,13 +482,15 @@ const styles = StyleSheet.create({
   },
   tabActive: { borderBottomColor: C.tint },
   tabActiveRed: { borderBottomColor: C.danger },
+  tabActiveMembers: { borderBottomColor: "#7C3AED" },
   tabText: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: "Inter_500Medium",
     color: C.textMuted,
   },
   tabTextActive: { color: C.tint, fontFamily: "Inter_600SemiBold" },
   tabTextRed: { color: C.danger, fontFamily: "Inter_600SemiBold" },
+  tabTextMembers: { color: "#7C3AED", fontFamily: "Inter_600SemiBold" },
 
   listContainer: { padding: 16, gap: 8 },
 
@@ -464,4 +571,40 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   fabBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
+
+  inviteCard: {
+    backgroundColor: C.card, borderRadius: 16, padding: 16, marginBottom: 16,
+    shadowColor: C.shadow, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 1, shadowRadius: 4, elevation: 1,
+  },
+  inviteTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: C.text, marginBottom: 4 },
+  inviteHint: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textMuted, marginBottom: 12, lineHeight: 17 },
+  inviteRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+  inviteInput: {
+    flex: 1, backgroundColor: C.background, borderRadius: 12, padding: 12,
+    fontSize: 15, fontFamily: "Inter_400Regular", color: C.text,
+    borderWidth: 1, borderColor: C.border,
+  },
+  inviteBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 6, backgroundColor: "#7C3AED", borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
+  },
+  inviteBtnDisabled: { opacity: 0.5 },
+  inviteBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
+
+  memberRow: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    backgroundColor: C.card, borderRadius: 14, padding: 14, marginBottom: 8,
+    shadowColor: C.shadow, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 1, shadowRadius: 3, elevation: 1,
+  },
+  memberAvatar: {
+    width: 40, height: 40, borderRadius: 12, backgroundColor: "#EDE9FE",
+    justifyContent: "center", alignItems: "center",
+  },
+  memberInfo: { flex: 1 },
+  memberPhone: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: C.text },
+  memberRole: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#7C3AED", marginTop: 2 },
+  removeBtn: {
+    width: 34, height: 34, borderRadius: 10, backgroundColor: C.dangerLight,
+    justifyContent: "center", alignItems: "center",
+  },
 });

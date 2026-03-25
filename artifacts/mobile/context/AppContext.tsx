@@ -12,6 +12,8 @@ export interface Company {
   id: string;
   name: string;
   notes: string;
+  ownerId: string;
+  members: string[];
 }
 
 export interface Product {
@@ -68,9 +70,11 @@ interface AppContextValue {
   trashedInvoices: SalesInvoice[];
   trashedReturns: ReturnInvoice[];
   isLoading: boolean;
-  addCompany: (name: string, notes: string) => Company;
+  addCompany: (name: string, notes: string, ownerId: string) => Company;
   updateCompany: (id: string, name: string, notes: string) => void;
   deleteCompany: (id: string) => void;
+  inviteMember: (companyId: string, phoneNumber: string) => boolean;
+  removeMember: (companyId: string, phoneNumber: string) => void;
   addProduct: (name: string, price: number) => void;
   updateProduct: (id: string, name: string, price: number) => void;
   deleteProduct: (id: string) => void;
@@ -126,6 +130,16 @@ function generateId(): string {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
 }
 
+function migrateCompany(raw: Record<string, unknown>): Company {
+  return {
+    id: raw.id as string,
+    name: raw.name as string,
+    notes: (raw.notes as string) ?? "",
+    ownerId: (raw.ownerId as string) ?? "",
+    members: (raw.members as string[]) ?? [],
+  };
+}
+
 function migrateSalesInvoice(raw: Record<string, unknown>): SalesInvoice {
   return {
     id: raw.id as string,
@@ -178,7 +192,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem(STORAGE_KEYS.invoiceCounter),
           AsyncStorage.getItem(STORAGE_KEYS.returnCounter),
         ]);
-        if (c) setCompanies(JSON.parse(c));
+        if (c) setCompanies(JSON.parse(c).map(migrateCompany));
         if (p) setProducts(JSON.parse(p));
         if (s) {
           const parsed = JSON.parse(s);
@@ -226,12 +240,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addCompany = useCallback(
-    (name: string, notes: string): Company => {
-      const company: Company = { id: generateId(), name: name.trim(), notes: notes.trim() };
+    (name: string, notes: string, ownerId: string): Company => {
+      const company: Company = {
+        id: generateId(),
+        name: name.trim(),
+        notes: notes.trim(),
+        ownerId,
+        members: [ownerId],
+      };
       const updated = [...companies, company];
       setCompanies(updated);
       saveCompanies(updated);
       return company;
+    },
+    [companies, saveCompanies]
+  );
+
+  const inviteMember = useCallback(
+    (companyId: string, phoneNumber: string): boolean => {
+      const phone = phoneNumber.trim();
+      if (!phone) return false;
+      const updated = companies.map((c) => {
+        if (c.id !== companyId) return c;
+        if (c.members.includes(phone)) return c;
+        return { ...c, members: [...c.members, phone] };
+      });
+      setCompanies(updated);
+      saveCompanies(updated);
+      return true;
+    },
+    [companies, saveCompanies]
+  );
+
+  const removeMember = useCallback(
+    (companyId: string, phoneNumber: string) => {
+      const updated = companies.map((c) => {
+        if (c.id !== companyId) return c;
+        return { ...c, members: c.members.filter((m) => m !== phoneNumber) };
+      });
+      setCompanies(updated);
+      saveCompanies(updated);
     },
     [companies, saveCompanies]
   );
@@ -503,6 +551,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addCompany,
       updateCompany,
       deleteCompany,
+      inviteMember,
+      removeMember,
       addProduct,
       updateProduct,
       deleteProduct,
@@ -532,6 +582,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addCompany,
       updateCompany,
       deleteCompany,
+      inviteMember,
+      removeMember,
       addProduct,
       updateProduct,
       deleteProduct,

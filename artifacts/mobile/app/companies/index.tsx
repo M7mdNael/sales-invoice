@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { Company, useApp } from "@/context/AppContext";
 import { useLang } from "@/context/LanguageContext";
+import { useUser } from "@/context/UserContext";
 
 const C = Colors.light;
 
@@ -26,6 +27,7 @@ export default function CompaniesScreen() {
   const insets = useSafeAreaInsets();
   const { companies, salesInvoices, addCompany, updateCompany, deleteCompany } = useApp();
   const { t, isRTL } = useLang();
+  const { user } = useUser();
   const [mode, setMode] = useState<Mode>("list");
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [name, setName] = useState("");
@@ -53,10 +55,11 @@ export default function CompaniesScreen() {
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const ownerId = user?.phone ?? "";
     if (mode === "edit" && editingCompany) {
       updateCompany(editingCompany.id, name.trim(), notes.trim());
     } else {
-      addCompany(name.trim(), notes.trim());
+      addCompany(name.trim(), notes.trim(), ownerId);
     }
     setMode("list");
   };
@@ -140,12 +143,15 @@ export default function CompaniesScreen() {
         keyExtractor={(c) => c.id}
         renderItem={({ item }) => {
           const count = salesInvoices.filter((inv) => inv.companyId === item.id).length;
+          const isOwner = item.ownerId === user?.phone;
           return (
             <CompanyCard
               company={item}
               invoiceCount={count}
               isRTL={isRTL}
               invoicesLabel={t("invoices")}
+              isOwner={isOwner}
+              memberCount={item.members.length}
               onEdit={() => openEdit(item)}
               onDelete={() => handleDelete(item)}
             />
@@ -185,6 +191,8 @@ function CompanyCard({
   invoiceCount,
   isRTL,
   invoicesLabel,
+  isOwner,
+  memberCount,
   onEdit,
   onDelete,
 }: {
@@ -192,6 +200,8 @@ function CompanyCard({
   invoiceCount: number;
   isRTL: boolean;
   invoicesLabel: string;
+  isOwner: boolean;
+  memberCount: number;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -208,9 +218,20 @@ function CompanyCard({
         {company.notes ? (
           <Text style={[styles.companyNotes, isRTL && styles.textRTL]} numberOfLines={1}>{company.notes}</Text>
         ) : null}
-        <Text style={[styles.invoiceCount, isRTL && styles.textRTL]}>
-          {invoiceCount} {invoicesLabel}
-        </Text>
+        <View style={[styles.metaRow, isRTL && styles.metaRowRTL]}>
+          <Text style={[styles.invoiceCount]}>{invoiceCount} {invoicesLabel}</Text>
+          {memberCount > 0 && (
+            <View style={styles.memberBadge}>
+              <Feather name="users" size={11} color="#7C3AED" />
+              <Text style={styles.memberBadgeText}>{memberCount}</Text>
+            </View>
+          )}
+          {isOwner && (
+            <View style={styles.ownerBadge}>
+              <Text style={styles.ownerBadgeText}>Owner</Text>
+            </View>
+          )}
+        </View>
       </View>
       <Pressable style={styles.editBtn} onPress={(e) => { e.stopPropagation?.(); onEdit(); }}>
         <Feather name="edit-2" size={16} color={C.tint} />
@@ -240,7 +261,16 @@ const styles = StyleSheet.create({
   cardBodyRTL: { marginRight: 14 },
   companyName: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: C.text },
   companyNotes: { fontSize: 13, fontFamily: "Inter_400Regular", color: C.textSecondary, marginTop: 2 },
-  invoiceCount: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#7C3AED", marginTop: 3 },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4, flexWrap: "wrap" },
+  metaRowRTL: { flexDirection: "row-reverse" },
+  invoiceCount: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#7C3AED" },
+  memberBadge: {
+    flexDirection: "row", alignItems: "center", gap: 3,
+    backgroundColor: "#EDE9FE", borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2,
+  },
+  memberBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#7C3AED" },
+  ownerBadge: { backgroundColor: "#DBEAFE", borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  ownerBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#1A73E8" },
   textRTL: { textAlign: "right" },
   editBtn: {
     width: 36, height: 36, borderRadius: 10, backgroundColor: C.tintLight,
