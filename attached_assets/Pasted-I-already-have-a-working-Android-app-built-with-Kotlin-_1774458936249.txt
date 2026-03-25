@@ -1,0 +1,79 @@
+I already have a working Android app built with Kotlin, Jetpack Compose, Room, and MVVM. It currently supports invoices, returns, companies, and PDF export.
+I want you to upgrade the app to support 2+ devices (multi-user system) using Firebase. Modify the existing project without breaking current features.
+1) Add Firebase Integration
+Use:
+Firebase Authentication
+Firebase Firestore
+Requirements:
+Add Firebase dependencies
+Initialize Firebase properly
+Replace local-only logic with cloud sync
+2) Authentication System
+Implement simple login:
+Email + password
+Each user must have unique UID
+Store user session locally
+3) Companies Ownership Model
+Modify Company entity:
+Company(
+id
+name
+ownerId
+users: List (userIds)
+inviteCode
+)
+Rules:
+Owner creates company
+Owner can invite other users
+Only users inside company can access its data
+4) Invite Code System (CRITICAL)
+When creating a company:
+Generate random 5-digit invite code
+Example:
+
+inviteCode = (10000..99999).random().toString()
+Add screen:
+“Join Company”
+Input invite code
+Logic:
+Find company by inviteCode
+Add current userId to company.users
+5) Firestore Data Structure
+collections:
+companies/ companyId name ownerId users[] inviteCode
+invoices/ invoiceId companyId createdBy date total items[]
+returns/ returnId companyId invoiceId total
+6) Sync Logic
+Replace Room insert with Firestore:
+Kotlin
+FirebaseFirestore.getInstance()
+    .collection("invoices")
+    .add(invoice)
+Use real-time listeners:
+Kotlin
+.addSnapshotListener { snapshot, _ -> }
+Filter by companyId:
+Only load data for current company
+7) Multi-Device Behavior
+Device 1 creates invoice → appears instantly on Device 2
+Device 2 creates return → appears on Device 1
+All users share same company data
+8) Security Rules (IMPORTANT)
+User can read/write only if:
+userId exists in company.users
+9) UI Changes
+Add Login Screen
+Add Join Company Screen
+Show current company name
+Show invite code inside company settings
+Add Logout button
+10) Constraints
+Do NOT break existing UI
+Keep JOD currency
+Keep PDF export working
+Maintain MVVM architecture
+Output Requirements:
+Provide only modified and new files
+Include Firebase setup steps (google-services.json placement)
+Ensure project compiles without errors
+Upgrade the project professionally to support real-time multi-device usage with clean architecture
