@@ -12,13 +12,14 @@ export interface UserProfile {
   phone: string;
   firstName: string;
   lastName: string;
+  email: string;
 }
 
 interface UserContextValue {
   user: UserProfile | null;
   isLoading: boolean;
-  register: (phone: string, firstName: string, lastName: string) => Promise<void>;
-  updateProfile: (phone: string, firstName: string, lastName: string) => Promise<void>;
+  register: (phone: string, firstName: string, lastName: string, email: string) => Promise<void>;
+  updateProfile: (phone: string, firstName: string, lastName: string, email: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -34,7 +35,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.getItem(USER_KEY).then((raw) => {
       if (raw) {
         try {
-          setUser(JSON.parse(raw));
+          const parsed = JSON.parse(raw);
+          setUser({ email: "", ...parsed });
         } catch {
           setUser(null);
         }
@@ -43,14 +45,34 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const register = useCallback(async (phone: string, firstName: string, lastName: string) => {
-    const profile: UserProfile = { phone: phone.trim(), firstName: firstName.trim(), lastName: lastName.trim() };
+  const register = useCallback(async (
+    phone: string,
+    firstName: string,
+    lastName: string,
+    email: string,
+  ) => {
+    const profile: UserProfile = {
+      phone: phone.trim(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: email.trim().toLowerCase(),
+    };
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(profile));
     setUser(profile);
   }, []);
 
-  const updateProfile = useCallback(async (phone: string, firstName: string, lastName: string) => {
-    const profile: UserProfile = { phone: phone.trim(), firstName: firstName.trim(), lastName: lastName.trim() };
+  const updateProfile = useCallback(async (
+    phone: string,
+    firstName: string,
+    lastName: string,
+    email: string,
+  ) => {
+    const profile: UserProfile = {
+      phone: phone.trim(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: email.trim().toLowerCase(),
+    };
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(profile));
     setUser(profile);
   }, []);

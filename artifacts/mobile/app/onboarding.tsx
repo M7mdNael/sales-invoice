@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -18,13 +18,39 @@ import { useUser } from "@/context/UserContext";
 
 const C = Colors.light;
 
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const { register } = useUser();
+
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [emailError, setEmailError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const emailRef = useRef<TextInput>(null);
+  const firstNameRef = useRef<TextInput>(null);
+  const lastNameRef = useRef<TextInput>(null);
+
+  const handleEmailChange = (val: string) => {
+    setEmail(val);
+    if (emailError && (!val.trim() || isValidEmail(val))) {
+      setEmailError("");
+    }
+  };
+
+  const handleEmailBlur = () => {
+    if (email.trim() && !isValidEmail(email)) {
+      setEmailError("Please enter a valid email address.");
+    } else {
+      setEmailError("");
+    }
+  };
 
   const handleRegister = async () => {
     const trimmedPhone = phone.trim().replace(/\s+/g, "");
@@ -36,13 +62,18 @@ export default function OnboardingScreen() {
       Alert.alert("Invalid Phone", "Please enter a valid phone number.");
       return;
     }
+    if (email.trim() && !isValidEmail(email)) {
+      setEmailError("Please enter a valid email address.");
+      emailRef.current?.focus();
+      return;
+    }
     if (!firstName.trim()) {
       Alert.alert("Name Required", "Please enter your first name.");
       return;
     }
     setSaving(true);
     try {
-      await register(trimmedPhone, firstName.trim(), lastName.trim());
+      await register(trimmedPhone, firstName.trim(), lastName.trim(), email.trim());
     } finally {
       setSaving(false);
     }
@@ -69,13 +100,14 @@ export default function OnboardingScreen() {
         <Text style={styles.subtitle}>Create your profile to get started</Text>
 
         <View style={styles.card}>
+          {/* Phone */}
           <Text style={styles.fieldLabel}>PHONE NUMBER *</Text>
-          <View style={styles.phoneRow}>
-            <View style={styles.phonePrefix}>
-              <Text style={styles.phonePrefixText}>📱</Text>
+          <View style={styles.iconRow}>
+            <View style={styles.iconBox}>
+              <Text style={styles.iconEmoji}>📱</Text>
             </View>
             <TextInput
-              style={styles.phoneInput}
+              style={styles.iconInput}
               placeholder="e.g. 0787257541"
               placeholderTextColor={C.textMuted}
               value={phone}
@@ -83,14 +115,51 @@ export default function OnboardingScreen() {
               keyboardType="phone-pad"
               autoFocus
               returnKeyType="next"
+              onSubmitEditing={() => emailRef.current?.focus()}
             />
           </View>
           <Text style={styles.hint}>
-            Your phone number is your unique ID. Others use it to invite you to their company.
+            Your phone number is your unique ID — others use it to invite you to their company.
           </Text>
 
+          {/* Email */}
+          <Text style={[styles.fieldLabel, { marginTop: 16 }]}>EMAIL ADDRESS</Text>
+          <View style={[styles.iconRow, emailError ? styles.iconRowError : null]}>
+            <View style={styles.iconBox}>
+              <Feather name="mail" size={18} color={emailError ? C.danger : C.textMuted} />
+            </View>
+            <TextInput
+              ref={emailRef}
+              style={styles.iconInput}
+              placeholder="you@example.com (optional)"
+              placeholderTextColor={C.textMuted}
+              value={email}
+              onChangeText={handleEmailChange}
+              onBlur={handleEmailBlur}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+              onSubmitEditing={() => firstNameRef.current?.focus()}
+            />
+            {!!(email.trim()) && isValidEmail(email) && (
+              <View style={styles.validIcon}>
+                <Feather name="check" size={14} color={C.success} />
+              </View>
+            )}
+          </View>
+          {emailError ? (
+            <Text style={styles.errorText}>{emailError}</Text>
+          ) : (
+            <Text style={styles.hint}>
+              Optional — can also be used to invite you to a company.
+            </Text>
+          )}
+
+          {/* First name */}
           <Text style={[styles.fieldLabel, { marginTop: 16 }]}>FIRST NAME *</Text>
           <TextInput
+            ref={firstNameRef}
             style={styles.input}
             placeholder="First name"
             placeholderTextColor={C.textMuted}
@@ -98,10 +167,13 @@ export default function OnboardingScreen() {
             onChangeText={setFirstName}
             autoCapitalize="words"
             returnKeyType="next"
+            onSubmitEditing={() => lastNameRef.current?.focus()}
           />
 
+          {/* Last name */}
           <Text style={styles.fieldLabel}>LAST NAME</Text>
           <TextInput
+            ref={lastNameRef}
             style={styles.input}
             placeholder="Last name (optional)"
             placeholderTextColor={C.textMuted}
@@ -151,22 +223,30 @@ const styles = StyleSheet.create({
     fontSize: 11, fontFamily: "Inter_600SemiBold", color: C.textSecondary,
     letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 8,
   },
-  phoneRow: {
+  iconRow: {
     flexDirection: "row", alignItems: "center",
     backgroundColor: C.background, borderRadius: 12, borderWidth: 1, borderColor: C.border,
     marginBottom: 8, overflow: "hidden",
   },
-  phonePrefix: {
+  iconRowError: { borderColor: C.danger },
+  iconBox: {
     width: 44, height: 50, justifyContent: "center", alignItems: "center",
     borderRightWidth: 1, borderRightColor: C.border,
   },
-  phonePrefixText: { fontSize: 20 },
-  phoneInput: {
+  iconEmoji: { fontSize: 20 },
+  iconInput: {
     flex: 1, fontSize: 16, fontFamily: "Inter_400Regular", color: C.text,
     paddingHorizontal: 14, height: 50,
   },
+  validIcon: {
+    width: 36, height: 50, justifyContent: "center", alignItems: "center",
+  },
   hint: {
     fontSize: 12, fontFamily: "Inter_400Regular", color: C.textMuted,
+    marginBottom: 4, lineHeight: 17,
+  },
+  errorText: {
+    fontSize: 12, fontFamily: "Inter_400Regular", color: C.danger,
     marginBottom: 4, lineHeight: 17,
   },
   input: {

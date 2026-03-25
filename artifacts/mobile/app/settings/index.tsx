@@ -27,7 +27,11 @@ export default function SettingsScreen() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [firstName, setFirstName] = useState(user?.firstName ?? "");
   const [lastName, setLastName] = useState(user?.lastName ?? "");
+  const [email, setEmail] = useState(user?.email ?? "");
+  const [emailError, setEmailError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const isValidEmail = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
   const handleSetLanguage = async (newLang: "en" | "ar") => {
     if (newLang === lang) return;
@@ -46,9 +50,14 @@ export default function SettingsScreen() {
       Alert.alert("Name Required", "Please enter your first name.");
       return;
     }
+    if (email.trim() && !isValidEmail(email)) {
+      setEmailError("Please enter a valid email address.");
+      return;
+    }
+    setEmailError("");
     setSaving(true);
     try {
-      await updateProfile(user?.phone ?? "", firstName.trim(), lastName.trim());
+      await updateProfile(user?.phone ?? "", firstName.trim(), lastName.trim(), email.trim());
       setEditingProfile(false);
     } finally {
       setSaving(false);
@@ -97,10 +106,33 @@ export default function SettingsScreen() {
               placeholderTextColor={C.textMuted}
               textAlign={isRTL ? "right" : "left"}
             />
-            <View style={styles.formActions}>
+            <Text style={[styles.fieldLabel, isRTL && styles.textRTL]}>EMAIL ADDRESS</Text>
+            <View style={[styles.emailRow, emailError ? styles.emailRowError : null]}>
+              <Feather name="mail" size={16} color={emailError ? C.danger : C.textMuted} style={{ marginLeft: 14 }} />
+              <TextInput
+                style={[styles.emailInput, isRTL && styles.inputRTL]}
+                value={email}
+                onChangeText={(v) => { setEmail(v); if (emailError) setEmailError(""); }}
+                placeholder="you@example.com (optional)"
+                placeholderTextColor={C.textMuted}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                textAlign={isRTL ? "right" : "left"}
+              />
+              {!!(email.trim()) && isValidEmail(email) && (
+                <Feather name="check-circle" size={16} color={C.success} style={{ marginRight: 14 }} />
+              )}
+            </View>
+            {emailError ? (
+              <Text style={styles.errorText}>{emailError}</Text>
+            ) : null}
+            <View style={[styles.formActions, { marginTop: emailError ? 4 : 16 }]}>
               <Pressable style={styles.cancelBtn} onPress={() => {
                 setFirstName(user?.firstName ?? "");
                 setLastName(user?.lastName ?? "");
+                setEmail(user?.email ?? "");
+                setEmailError("");
                 setEditingProfile(false);
               }}>
                 <Text style={styles.cancelBtnText}>{t("cancel")}</Text>
@@ -126,11 +158,18 @@ export default function SettingsScreen() {
                 <Feather name="phone" size={12} color={C.textMuted} />
                 <Text style={styles.profilePhone}>{user?.phone}</Text>
               </View>
-              <Text style={styles.profileIdHint}>This is your unique ID</Text>
+              {user?.email ? (
+                <View style={styles.phoneRow}>
+                  <Feather name="mail" size={12} color={C.textMuted} />
+                  <Text style={styles.profilePhone}>{user.email}</Text>
+                </View>
+              ) : null}
+              <Text style={styles.profileIdHint}>Phone is your unique ID</Text>
             </View>
             <Pressable style={styles.editProfileBtn} onPress={() => {
               setFirstName(user?.firstName ?? "");
               setLastName(user?.lastName ?? "");
+              setEmail(user?.email ?? "");
               setEditingProfile(true);
             }}>
               <Feather name="edit-2" size={16} color={C.tint} />
@@ -304,6 +343,17 @@ const styles = StyleSheet.create({
   infoLabel: { fontSize: 14, fontFamily: "Inter_400Regular", color: C.textSecondary },
   infoValue: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: C.text },
   infoDivider: { height: 1, backgroundColor: C.borderLight, marginHorizontal: 16 },
+  emailRow: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: C.background, borderRadius: 12, borderWidth: 1, borderColor: C.border,
+    marginBottom: 6, overflow: "hidden",
+  },
+  emailRowError: { borderColor: C.danger },
+  emailInput: {
+    flex: 1, fontSize: 15, fontFamily: "Inter_400Regular", color: C.text,
+    paddingHorizontal: 10, paddingVertical: 13,
+  },
+  errorText: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.danger, marginBottom: 4 },
 
   logoutBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,

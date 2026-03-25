@@ -37,22 +37,29 @@ export default function CompanyDetailScreen() {
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom + 16;
   const isOwner = company?.ownerId === user?.phone;
 
+  const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
   const handleInvite = () => {
-    const phone = invitePhone.trim().replace(/\s+/g, "");
-    if (!phone) return;
-    if (phone === user?.phone) {
+    const raw = invitePhone.trim();
+    const identifier = isEmail(raw) ? raw.toLowerCase() : raw.replace(/\s+/g, "");
+    if (!identifier) return;
+    if (identifier === user?.phone || identifier === user?.email) {
       Alert.alert("Invalid", "You cannot invite yourself.");
       return;
     }
-    if (company?.members.includes(phone)) {
-      Alert.alert("Already a member", `${phone} is already in this company.`);
+    if (company?.members.includes(identifier)) {
+      Alert.alert("Already a member", `${identifier} is already in this company.`);
+      return;
+    }
+    if (!isEmail(identifier) && identifier.length < 7) {
+      Alert.alert("Invalid", "Please enter a valid phone number or email address.");
       return;
     }
     setInviting(true);
-    inviteMember(id!, phone);
+    inviteMember(id!, identifier);
     setInvitePhone("");
     setInviting(false);
-    Alert.alert("Member Added", `${phone} has been added to ${company?.name}.`);
+    Alert.alert("Member Added", `${identifier} has been added to ${company?.name}.`);
   };
 
   const handleRemoveMember = (phone: string) => {
@@ -214,18 +221,20 @@ export default function CompanyDetailScreen() {
             <View>
               {isOwner && (
                 <View style={styles.inviteCard}>
-                  <Text style={styles.inviteTitle}>Invite by Phone Number</Text>
+                  <Text style={styles.inviteTitle}>Invite Member</Text>
                   <Text style={styles.inviteHint}>
-                    Enter the phone number of the person you want to add to this company.
+                    Enter a phone number or email address to add them to this company.
                   </Text>
                   <View style={styles.inviteRow}>
                     <TextInput
                       style={styles.inviteInput}
-                      placeholder="e.g. 0787257541"
+                      placeholder="Phone or email"
                       placeholderTextColor={C.textMuted}
                       value={invitePhone}
                       onChangeText={setInvitePhone}
-                      keyboardType="phone-pad"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
                       returnKeyType="done"
                       onSubmitEditing={handleInvite}
                     />
@@ -249,30 +258,50 @@ export default function CompanyDetailScreen() {
                   <Text style={styles.emptyText}>No members yet</Text>
                 </View>
               ) : (
-                company.members.map((phone) => (
-                  <View key={phone} style={styles.memberRow}>
-                    <View style={styles.memberAvatar}>
-                      <Feather name="user" size={18} color="#7C3AED" />
-                    </View>
-                    <View style={styles.memberInfo}>
-                      <Text style={styles.memberPhone}>{phone}</Text>
-                      {phone === company.ownerId && (
-                        <Text style={styles.memberRole}>Owner</Text>
+                company.members.map((member) => {
+                  const memberIsEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(member);
+                  const isYou = member === user?.phone || member === user?.email;
+                  const isOwnerMember = member === company.ownerId;
+                  return (
+                    <View key={member} style={styles.memberRow}>
+                      <View style={[styles.memberAvatar, memberIsEmail && styles.memberAvatarEmail]}>
+                        <Feather
+                          name={memberIsEmail ? "mail" : "user"}
+                          size={18}
+                          color={memberIsEmail ? C.tint : "#7C3AED"}
+                        />
+                      </View>
+                      <View style={styles.memberInfo}>
+                        <Text style={styles.memberPhone}>{member}</Text>
+                        <View style={styles.memberRoleRow}>
+                          {isOwnerMember && (
+                            <View style={styles.roleBadge}>
+                              <Text style={styles.memberRole}>Owner</Text>
+                            </View>
+                          )}
+                          {isYou && (
+                            <View style={[styles.roleBadge, styles.roleBadgeYou]}>
+                              <Text style={[styles.memberRole, { color: C.tint }]}>You</Text>
+                            </View>
+                          )}
+                          {memberIsEmail && (
+                            <View style={[styles.roleBadge, styles.roleBadgeEmail]}>
+                              <Text style={[styles.memberRole, { color: C.tint }]}>Email</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                      {isOwner && !isOwnerMember && (
+                        <Pressable
+                          style={styles.removeBtn}
+                          onPress={() => handleRemoveMember(member)}
+                        >
+                          <Feather name="x" size={16} color={C.danger} />
+                        </Pressable>
                       )}
-                      {phone === user?.phone && phone !== company.ownerId && (
-                        <Text style={[styles.memberRole, { color: C.tint }]}>You</Text>
-                      )}
                     </View>
-                    {isOwner && phone !== company.ownerId && (
-                      <Pressable
-                        style={styles.removeBtn}
-                        onPress={() => handleRemoveMember(phone)}
-                      >
-                        <Feather name="x" size={16} color={C.danger} />
-                      </Pressable>
-                    )}
-                  </View>
-                ))
+                  );
+                })
               )}
             </View>
           )}
@@ -601,8 +630,13 @@ const styles = StyleSheet.create({
     justifyContent: "center", alignItems: "center",
   },
   memberInfo: { flex: 1 },
-  memberPhone: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: C.text },
-  memberRole: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#7C3AED", marginTop: 2 },
+  memberPhone: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: C.text },
+  memberAvatarEmail: { backgroundColor: "#DBEAFE" },
+  memberRoleRow: { flexDirection: "row", gap: 4, marginTop: 3, flexWrap: "wrap" },
+  roleBadge: { backgroundColor: "#EDE9FE", borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
+  roleBadgeYou: { backgroundColor: C.tintLight },
+  roleBadgeEmail: { backgroundColor: C.tintLight },
+  memberRole: { fontSize: 11, fontFamily: "Inter_500Medium", color: "#7C3AED" },
   removeBtn: {
     width: 34, height: 34, borderRadius: 10, backgroundColor: C.dangerLight,
     justifyContent: "center", alignItems: "center",
