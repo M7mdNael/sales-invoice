@@ -1,14 +1,20 @@
 import { Router } from "express";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
 const router = Router();
 
 const otpStore = new Map<string, { code: string; expiresAt: number }>();
 
-async function getResendClient(): Promise<{ client: Resend }> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) throw new Error("RESEND_API_KEY secret is not set.");
-  return { client: new Resend(apiKey) };
+function createTransporter() {
+  const pass = process.env.GMAIL_APP_PASSWORD;
+  if (!pass) throw new Error("GMAIL_APP_PASSWORD secret is not set.");
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: "salesinvoiceapp@gmail.com",
+      pass,
+    },
+  });
 }
 
 router.post("/verify/send", async (req, res) => {
@@ -25,10 +31,10 @@ router.post("/verify/send", async (req, res) => {
       expiresAt: Date.now() + 10 * 60 * 1000,
     });
 
-    const { client } = await getResendClient();
+    const transporter = createTransporter();
 
-    const { error: sendError } = await client.emails.send({
-      from: "Sales Manager <onboarding@resend.dev>",
+    await transporter.sendMail({
+      from: '"Sales Manager" <salesinvoiceapp@gmail.com>',
       to: email.trim(),
       subject: "Your Sales Manager verification code",
       html: `
@@ -45,27 +51,9 @@ router.post("/verify/send", async (req, res) => {
       `,
     });
 
-    if (sendError) {
-      const isTestingRestriction =
-        sendError.message?.includes("verify a domain") ||
-        sendError.message?.includes("testing emails") ||
-        sendError.name === "validation_error";
-
-      if (isTestingRestriction) {
-        console.warn("Resend test mode restriction:", JSON.stringify(sendError));
-        console.warn("Returning dev code directly:", code);
-        res.json({ success: true, devCode: code, devMode: true });
-        return;
-      }
-
-      console.error("Resend send error:", JSON.stringify(sendError));
-      res.status(500).json({ error: `Failed to send email: ${sendError.message}` });
-      return;
-    }
-
     res.json({ success: true });
   } catch (err: any) {
-    console.error("verify/send error:", err);
+    console.error("verify/send error:", err?.message ?? err);
     res.status(500).json({ error: "Failed to send verification email. Please try again." });
   }
 });
