@@ -5,35 +5,10 @@ const router = Router();
 
 const otpStore = new Map<string, { code: string; expiresAt: number }>();
 
-async function getResendClient(): Promise<{ client: Resend; from: string }> {
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY
-    ? "repl " + process.env.REPL_IDENTITY
-    : process.env.WEB_REPL_RENEWAL
-    ? "depl " + process.env.WEB_REPL_RENEWAL
-    : null;
-
-  if (!xReplitToken || !hostname) {
-    throw new Error("Replit connector env vars not found");
-  }
-
-  const data = await fetch(
-    `https://${hostname}/api/v2/connection?include_secrets=true&connector_names=resend`,
-    {
-      headers: {
-        Accept: "application/json",
-        "X-Replit-Token": xReplitToken,
-      },
-    }
-  ).then((r) => r.json());
-
-  const settings = data?.items?.[0]?.settings;
-  if (!settings?.api_key) throw new Error("Resend not connected");
-
-  return {
-    client: new Resend(settings.api_key),
-    from: settings.from_email ?? "noreply@resend.dev",
-  };
+async function getResendClient(): Promise<{ client: Resend }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error("RESEND_API_KEY secret is not set.");
+  return { client: new Resend(apiKey) };
 }
 
 router.post("/verify/send", async (req, res) => {
