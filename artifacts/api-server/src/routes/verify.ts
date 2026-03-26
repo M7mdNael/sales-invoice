@@ -77,12 +77,13 @@ router.post("/verify/send", async (req, res) => {
         sendError.name === "validation_error";
 
       if (isTestingRestriction) {
-        console.warn("Resend test mode — returning dev code directly:", code);
+        console.warn("Resend test mode restriction:", JSON.stringify(sendError));
+        console.warn("Returning dev code directly:", code);
         res.json({ success: true, devCode: code, devMode: true });
         return;
       }
 
-      console.error("Resend send error:", sendError);
+      console.error("Resend send error:", JSON.stringify(sendError));
       res.status(500).json({ error: `Failed to send email: ${sendError.message}` });
       return;
     }
