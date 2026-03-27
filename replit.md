@@ -65,3 +65,28 @@ Offline Sales & Sales Return invoicing system built with Expo React Native.
 - `utils/pdf.ts` — PDF HTML generation + expo-print + expo-sharing
 - `utils/format.ts` — Currency (JOD) and date formatting
 - `constants/colors.ts` — Theme colors (blue #1A73E8, success/danger/warning)
+
+## API Server (`artifacts/api-server`)
+
+Express 5 backend with routes:
+- `GET /api/healthz` — Health check
+- `POST /api/verify/send` — Send OTP email via nodemailer/Gmail (requires GMAIL_APP_PASSWORD secret)
+- `POST /api/verify/check` — Verify OTP code
+
+Runs on port 8080 (localhost), workflow: "Start Backend API".
+
+## Workflows
+
+- **Start Backend API** — `pnpm --filter @workspace/api-server run dev` on port 8080
+- **Start Mobile App** — `PORT=18115 pnpm --filter @workspace/mobile run dev` on port 18115
+
+## Environment / Secrets
+
+- `DATABASE_URL` — PostgreSQL connection (provisioned)
+- `GMAIL_APP_PASSWORD` — Required for email OTP sending (not yet set)
+
+## Development Notes
+
+- API server dev script sets PORT to 8080 by default if not provided
+- Mobile Expo app runs on port 18115 with QR code for Expo Go
+- The mockup-sandbox artifact runs on port 8081 for UI prototyping
