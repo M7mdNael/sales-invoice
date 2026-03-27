@@ -196,6 +196,9 @@ function InvoiceCard({ invoice, isRTL, onDelete }: { invoice: SalesInvoice; isRT
         <Text style={[styles.cardItems, isRTL && styles.textRTL]}>
           {invoice.items.length} item{invoice.items.length !== 1 ? "s" : ""}
         </Text>
+        {!!invoice.creatorName && (
+          <Text style={[styles.cardCreator, isRTL && styles.textRTL]}>By {invoice.creatorName}</Text>
+        )}
       </View>
       <Pressable style={styles.cardTrashBtn} onPress={(e) => { e.stopPropagation?.(); onDelete(); }}>
         <Feather name="trash-2" size={16} color={C.danger} />
@@ -351,6 +354,7 @@ const styles = StyleSheet.create({
   cardCustomer: { fontSize: 13, fontFamily: "Inter_400Regular", color: C.textSecondary },
   cardDate: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textMuted },
   cardItems: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textMuted, marginTop: 2 },
+  cardCreator: { fontSize: 11, fontFamily: "Inter_400Regular", color: C.textMuted, marginTop: 1 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 80 },
   emptyIcon: {
     width: 80, height: 80, borderRadius: 24, backgroundColor: C.borderLight,

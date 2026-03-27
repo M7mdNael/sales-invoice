@@ -81,7 +81,7 @@ export default function CreateReturnScreen() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!selectedCompany) {
       Alert.alert(t("missingInfo"), t("selectCompanyFirst"));
       return;
@@ -98,14 +98,19 @@ export default function CreateReturnScreen() {
       quantity: c.quantity,
       price: c.product.price,
     }));
-    if (isEditing && existingReturn) {
-      const ret = updateReturnInvoice(existingReturn.id, selectedCompany, items);
-      router.dismissAll();
-      router.push(`/return/${ret.id}`);
-    } else {
-      const ret = addStandaloneReturn(selectedCompany, items);
-      router.dismissAll();
-      router.push(`/return/${ret.id}`);
+    try {
+      if (isEditing && existingReturn) {
+        const ret = await updateReturnInvoice(existingReturn.id, selectedCompany, items);
+        router.dismissAll();
+        router.push(`/return/${ret.id}`);
+      } else {
+        const ret = await addStandaloneReturn(selectedCompany, items);
+        router.dismissAll();
+        router.push(`/return/${ret.id}`);
+      }
+    } catch (err: any) {
+      Alert.alert("Error", err?.message ?? "Failed to save return. Please try again.");
+      setSaving(false);
     }
   };
 

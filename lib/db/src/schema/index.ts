@@ -1,20 +1,58 @@
-// Export your models here. Add one export per file
-// export * from "./posts";
-//
-// Each model/table should ideally be split into different files.
-// Each model/table should define a Drizzle table, insert schema, and types:
-//
-//   import { pgTable, text, serial } from "drizzle-orm/pg-core";
-//   import { createInsertSchema } from "drizzle-zod";
-//   import { z } from "zod/v4";
-//
-//   export const postsTable = pgTable("posts", {
-//     id: serial("id").primaryKey(),
-//     title: text("title").notNull(),
-//   });
-//
-//   export const insertPostSchema = createInsertSchema(postsTable).omit({ id: true });
-//   export type InsertPost = z.infer<typeof insertPostSchema>;
-//   export type Post = typeof postsTable.$inferSelect;
+import { pgTable, text, real, timestamp } from "drizzle-orm/pg-core";
 
-export {}
+export const usersTable = pgTable("users", {
+  email: text("email").primaryKey(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull().default(""),
+  phone: text("phone").notNull().default(""),
+  workspaceId: text("workspace_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const workspacesTable = pgTable("workspaces", {
+  id: text("id").primaryKey(),
+  inviteCode: text("invite_code").notNull().unique(),
+  ownerEmail: text("owner_email").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const invoicesTable = pgTable("invoices", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id").notNull(),
+  invoiceNumber: text("invoice_number").notNull(),
+  companyId: text("company_id").notNull().default(""),
+  companyName: text("company_name").notNull().default(""),
+  customerName: text("customer_name").notNull(),
+  date: text("date").notNull(),
+  itemsJson: text("items_json").notNull(),
+  total: real("total").notNull(),
+  creatorEmail: text("creator_email").notNull(),
+  creatorName: text("creator_name").notNull(),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const returnsTable = pgTable("returns", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id").notNull(),
+  returnNumber: text("return_number").notNull(),
+  originalInvoiceId: text("original_invoice_id").notNull().default(""),
+  originalInvoiceNumber: text("original_invoice_number").notNull().default(""),
+  companyId: text("company_id").notNull().default(""),
+  companyName: text("company_name").notNull().default(""),
+  customerName: text("customer_name").notNull().default(""),
+  date: text("date").notNull(),
+  itemsJson: text("items_json").notNull(),
+  total: real("total").notNull(),
+  creatorEmail: text("creator_email").notNull(),
+  creatorName: text("creator_name").notNull(),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type User = typeof usersTable.$inferSelect;
+export type Workspace = typeof workspacesTable.$inferSelect;
+export type Invoice = typeof invoicesTable.$inferSelect;
+export type Return = typeof returnsTable.$inferSelect;

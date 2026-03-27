@@ -149,9 +149,20 @@ export default function OnboardingScreen() {
       Alert.alert("Name Required", "Please enter your first name.");
       return;
     }
+    if (!lastName.trim()) {
+      Alert.alert("Last Name Required", "Please enter your last name.");
+      return;
+    }
     setSaving(true);
     try {
       await register(trimmedPhone, firstName.trim(), lastName.trim(), email.trim().toLowerCase());
+    } catch (err: any) {
+      const msg = err?.message ?? "Registration failed. Please try again.";
+      if (Platform.OS === "web") {
+        Alert.alert("Error", msg);
+      } else {
+        Alert.alert("Error", msg);
+      }
     } finally {
       setSaving(false);
     }
@@ -360,11 +371,11 @@ export default function OnboardingScreen() {
               onSubmitEditing={() => lastNameRef.current?.focus()}
             />
 
-            <Text style={styles.fieldLabel}>LAST NAME</Text>
+            <Text style={styles.fieldLabel}>LAST NAME *</Text>
             <TextInput
               ref={lastNameRef}
               style={styles.input}
-              placeholder="Last name (optional)"
+              placeholder="Last name"
               placeholderTextColor={C.textMuted}
               value={lastName}
               onChangeText={setLastName}
@@ -389,9 +400,9 @@ export default function OnboardingScreen() {
         )}
 
         <View style={styles.noteCard}>
-          <Feather name="lock" size={14} color={C.textMuted} />
+          <Feather name="cloud" size={14} color={C.textMuted} />
           <Text style={styles.noteText}>
-            Your data is stored only on this device. No account or cloud sync required.
+            Your data is securely synced to the cloud. Share invoices with a colleague using a workspace invite code.
           </Text>
         </View>
       </ScrollView>

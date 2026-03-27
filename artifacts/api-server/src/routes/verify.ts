@@ -1,20 +1,14 @@
 import { Router } from "express";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 const router = Router();
 
 const otpStore = new Map<string, { code: string; expiresAt: number }>();
 
-function createTransporter() {
-  const pass = process.env.GMAIL_APP_PASSWORD;
-  if (!pass) throw new Error("GMAIL_APP_PASSWORD secret is not set.");
-  return nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: "salesinvoiceapp@gmail.com",
-      pass,
-    },
-  });
+function getResend() {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error("RESEND_API_KEY secret is not set.");
+  return new Resend(key);
 }
 
 router.post("/verify/send", async (req, res) => {
@@ -31,10 +25,9 @@ router.post("/verify/send", async (req, res) => {
       expiresAt: Date.now() + 10 * 60 * 1000,
     });
 
-    const transporter = createTransporter();
-
-    await transporter.sendMail({
-      from: '"Sales Manager" <salesinvoiceapp@gmail.com>',
+    const resend = getResend();
+    const { error: sendError } = await resend.emails.send({
+      from: "Sales Manager <onboarding@resend.dev>",
       to: email.trim(),
       subject: "Your Sales Manager verification code",
       html: `
@@ -51,10 +44,16 @@ router.post("/verify/send", async (req, res) => {
       `,
     });
 
+    if (sendError) {
+      console.error("Resend error:", sendError);
+      res.status(500).json({ error: "Failed to send verification email. Please try again." });
+      return;
+    }
+
     res.json({ success: true });
   } catch (err: any) {
     console.error("verify/send error:", err?.message ?? err);
-    res.status(500).json({ error: "Failed to send verification email. Please try again." });
+    res.status(500).json({ error: err?.message ?? "Failed to send verification email." });
   }
 });
 

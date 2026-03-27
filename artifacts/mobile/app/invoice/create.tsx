@@ -87,7 +87,7 @@ export default function CreateInvoiceScreen() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!selectedCompany) {
       Alert.alert(t("missingInfo"), t("selectCompanyFirst"));
       return;
@@ -104,14 +104,19 @@ export default function CreateInvoiceScreen() {
       quantity: c.quantity,
       price: c.product.price,
     }));
-    if (isEditing && existingInvoice) {
-      const invoice = updateSalesInvoice(existingInvoice.id, selectedCompany, selectedCompany.name, items);
-      router.dismissAll();
-      router.push(`/invoice/${invoice.id}`);
-    } else {
-      const invoice = addSalesInvoice(selectedCompany, selectedCompany.name, items);
-      router.dismissAll();
-      router.push(`/invoice/${invoice.id}`);
+    try {
+      if (isEditing && existingInvoice) {
+        const invoice = await updateSalesInvoice(existingInvoice.id, selectedCompany, selectedCompany.name, items);
+        router.dismissAll();
+        router.push(`/invoice/${invoice.id}`);
+      } else {
+        const invoice = await addSalesInvoice(selectedCompany, selectedCompany.name, items);
+        router.dismissAll();
+        router.push(`/invoice/${invoice.id}`);
+      }
+    } catch (err: any) {
+      Alert.alert("Error", err?.message ?? "Failed to save invoice. Please try again.");
+      setSaving(false);
     }
   };
 

@@ -5,8 +5,11 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+import { UserContext } from "./UserContext";
+import { getApiBase } from "@/utils/api";
 
 export interface Company {
   id: string;
@@ -39,6 +42,8 @@ export interface SalesInvoice {
   date: string;
   items: SalesInvoiceItem[];
   total: number;
+  creatorEmail: string;
+  creatorName: string;
 }
 
 export interface ReturnItem {
@@ -60,6 +65,8 @@ export interface ReturnInvoice {
   date: string;
   items: ReturnItem[];
   total: number;
+  creatorEmail: string;
+  creatorName: string;
 }
 
 interface AppContextValue {
@@ -70,6 +77,7 @@ interface AppContextValue {
   trashedInvoices: SalesInvoice[];
   trashedReturns: ReturnInvoice[];
   isLoading: boolean;
+  isSyncing: boolean;
   addCompany: (name: string, notes: string, ownerId: string) => Company;
   updateCompany: (id: string, name: string, notes: string) => void;
   deleteCompany: (id: string) => void;
@@ -82,35 +90,36 @@ interface AppContextValue {
     company: Company,
     customerName: string,
     items: Omit<SalesInvoiceItem, "id">[]
-  ) => SalesInvoice;
+  ) => Promise<SalesInvoice>;
   updateSalesInvoice: (
     id: string,
     company: Company,
     customerName: string,
     items: Omit<SalesInvoiceItem, "id">[]
-  ) => SalesInvoice;
+  ) => Promise<SalesInvoice>;
   addReturnInvoice: (
     originalInvoice: SalesInvoice,
     items: Omit<ReturnItem, "id">[]
-  ) => ReturnInvoice;
+  ) => Promise<ReturnInvoice>;
   addStandaloneReturn: (
     company: Company,
     items: Omit<ReturnItem, "id">[]
-  ) => ReturnInvoice;
+  ) => Promise<ReturnInvoice>;
   updateReturnInvoice: (
     id: string,
     company: Company,
     items: Omit<ReturnItem, "id">[]
-  ) => ReturnInvoice;
-  deleteSalesInvoice: (id: string) => void;
-  deleteReturnInvoice: (id: string) => void;
-  restoreSalesInvoice: (id: string) => void;
-  restoreReturnInvoice: (id: string) => void;
-  permanentlyDeleteInvoice: (id: string) => void;
-  permanentlyDeleteReturn: (id: string) => void;
-  emptyTrash: () => void;
+  ) => Promise<ReturnInvoice>;
+  deleteSalesInvoice: (id: string) => Promise<void>;
+  deleteReturnInvoice: (id: string) => Promise<void>;
+  restoreSalesInvoice: (id: string) => Promise<void>;
+  restoreReturnInvoice: (id: string) => Promise<void>;
+  permanentlyDeleteInvoice: (id: string) => Promise<void>;
+  permanentlyDeleteReturn: (id: string) => Promise<void>;
+  emptyTrash: () => Promise<void>;
   getNextInvoiceNumber: () => string;
   getNextReturnNumber: () => string;
+  refreshFromServer: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -118,10 +127,6 @@ const AppContext = createContext<AppContextValue | null>(null);
 const STORAGE_KEYS = {
   companies: "@invoice_app/companies",
   products: "@invoice_app/products",
-  salesInvoices: "@invoice_app/sales_invoices",
-  returnInvoices: "@invoice_app/return_invoices",
-  trashedInvoices: "@invoice_app/trashed_invoices",
-  trashedReturns: "@invoice_app/trashed_returns",
   invoiceCounter: "@invoice_app/invoice_counter",
   returnCounter: "@invoice_app/return_counter",
 };
@@ -143,32 +148,39 @@ function migrateCompany(raw: Record<string, unknown>): Company {
 function migrateSalesInvoice(raw: Record<string, unknown>): SalesInvoice {
   return {
     id: raw.id as string,
-    invoiceNumber: raw.invoiceNumber as string,
+    invoiceNumber: (raw.invoiceNumber as string) ?? "",
     companyId: (raw.companyId as string) ?? "",
-    companyName: (raw.companyName as string) ?? (raw.customerName as string) ?? "",
+    companyName: (raw.companyName as string) ?? "",
     customerName: (raw.customerName as string) ?? "",
-    date: raw.date as string,
+    date: (raw.date as string) ?? new Date().toISOString(),
     items: (raw.items as SalesInvoiceItem[]) ?? [],
-    total: raw.total as number,
+    total: (raw.total as number) ?? 0,
+    creatorEmail: (raw.creatorEmail as string) ?? "",
+    creatorName: (raw.creatorName as string) ?? "",
   };
 }
 
 function migrateReturnInvoice(raw: Record<string, unknown>): ReturnInvoice {
   return {
     id: raw.id as string,
-    returnNumber: raw.returnNumber as string,
-    originalInvoiceId: raw.originalInvoiceId as string,
-    originalInvoiceNumber: raw.originalInvoiceNumber as string,
+    returnNumber: (raw.returnNumber as string) ?? "",
+    originalInvoiceId: (raw.originalInvoiceId as string) ?? "",
+    originalInvoiceNumber: (raw.originalInvoiceNumber as string) ?? "",
     companyId: (raw.companyId as string) ?? "",
-    companyName: (raw.companyName as string) ?? (raw.customerName as string) ?? "",
+    companyName: (raw.companyName as string) ?? "",
     customerName: (raw.customerName as string) ?? "",
-    date: raw.date as string,
+    date: (raw.date as string) ?? new Date().toISOString(),
     items: (raw.items as ReturnItem[]) ?? [],
-    total: raw.total as number,
+    total: (raw.total as number) ?? 0,
+    creatorEmail: (raw.creatorEmail as string) ?? "",
+    creatorName: (raw.creatorName as string) ?? "",
   };
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const userCtx = useContext(UserContext);
+  const user = userCtx?.user ?? null;
+
   const [companies, setCompanies] = useState<Company[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [salesInvoices, setSalesInvoices] = useState<SalesInvoice[]>([]);
@@ -178,36 +190,77 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [invoiceCounter, setInvoiceCounter] = useState(0);
   const [returnCounter, setReturnCounter] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const lastFetchedEmail = useRef<string | null>(null);
+
+  const fetchFromServer = useCallback(async () => {
+    if (!user?.email) return;
+    setIsSyncing(true);
+    try {
+      const [invRes, retRes] = await Promise.all([
+        fetch(`${getApiBase()}/api/invoices?email=${encodeURIComponent(user.email)}`),
+        fetch(`${getApiBase()}/api/returns?email=${encodeURIComponent(user.email)}`),
+      ]);
+      const [invData, retData] = await Promise.all([invRes.json(), retRes.json()]);
+
+      const [trashInvRes, trashRetRes] = await Promise.all([
+        fetch(`${getApiBase()}/api/invoices?email=${encodeURIComponent(user.email)}&deleted=true`),
+        fetch(`${getApiBase()}/api/returns?email=${encodeURIComponent(user.email)}&deleted=true`),
+      ]);
+      const [trashInvData, trashRetData] = await Promise.all([trashInvRes.json(), trashRetRes.json()]);
+
+      if (invData.invoices) setSalesInvoices(invData.invoices.map(migrateSalesInvoice));
+      if (retData.returns) setReturnInvoices(retData.returns.map(migrateReturnInvoice));
+      if (trashInvData.invoices) setTrashedInvoices(trashInvData.invoices.map(migrateSalesInvoice));
+      if (trashRetData.returns) setTrashedReturns(trashRetData.returns.map(migrateReturnInvoice));
+
+      const allInvNums = [...(invData.invoices ?? []), ...(trashInvData.invoices ?? [])]
+        .map((inv: any) => {
+          const m = inv.invoiceNumber?.match(/INV-(\d+)/);
+          return m ? parseInt(m[1], 10) : 0;
+        });
+      if (allInvNums.length > 0) {
+        const maxInv = Math.max(...allInvNums);
+        if (maxInv > invoiceCounter) {
+          setInvoiceCounter(maxInv);
+          AsyncStorage.setItem(STORAGE_KEYS.invoiceCounter, String(maxInv));
+        }
+      }
+
+      const allRetNums = [...(retData.returns ?? []), ...(trashRetData.returns ?? [])]
+        .map((r: any) => {
+          const m = r.returnNumber?.match(/RET-(\d+)/);
+          return m ? parseInt(m[1], 10) : 0;
+        });
+      if (allRetNums.length > 0) {
+        const maxRet = Math.max(...allRetNums);
+        if (maxRet > returnCounter) {
+          setReturnCounter(maxRet);
+          AsyncStorage.setItem(STORAGE_KEYS.returnCounter, String(maxRet));
+        }
+      }
+    } catch (e) {
+      console.error("fetchFromServer error:", e);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [user?.email, invoiceCounter, returnCounter]);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [c, p, s, r, ti, tr, ic, rc] = await Promise.all([
+        const [c, p, ic, rc] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.companies),
           AsyncStorage.getItem(STORAGE_KEYS.products),
-          AsyncStorage.getItem(STORAGE_KEYS.salesInvoices),
-          AsyncStorage.getItem(STORAGE_KEYS.returnInvoices),
-          AsyncStorage.getItem(STORAGE_KEYS.trashedInvoices),
-          AsyncStorage.getItem(STORAGE_KEYS.trashedReturns),
           AsyncStorage.getItem(STORAGE_KEYS.invoiceCounter),
           AsyncStorage.getItem(STORAGE_KEYS.returnCounter),
         ]);
         if (c) setCompanies(JSON.parse(c).map(migrateCompany));
         if (p) setProducts(JSON.parse(p));
-        if (s) {
-          const parsed = JSON.parse(s);
-          setSalesInvoices(parsed.map(migrateSalesInvoice));
-        }
-        if (r) {
-          const parsed = JSON.parse(r);
-          setReturnInvoices(parsed.map(migrateReturnInvoice));
-        }
-        if (ti) setTrashedInvoices(JSON.parse(ti).map(migrateSalesInvoice));
-        if (tr) setTrashedReturns(JSON.parse(tr).map(migrateReturnInvoice));
         if (ic) setInvoiceCounter(parseInt(ic, 10));
         if (rc) setReturnCounter(parseInt(rc, 10));
       } catch (e) {
-        console.error("Failed to load data", e);
+        console.error("Failed to load local data", e);
       } finally {
         setIsLoading(false);
       }
@@ -215,28 +268,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     load();
   }, []);
 
+  useEffect(() => {
+    if (!isLoading && user?.email && user.email !== lastFetchedEmail.current) {
+      lastFetchedEmail.current = user.email;
+      fetchFromServer();
+    }
+  }, [isLoading, user?.email, fetchFromServer]);
+
   const saveCompanies = useCallback(async (data: Company[]) => {
     await AsyncStorage.setItem(STORAGE_KEYS.companies, JSON.stringify(data));
   }, []);
 
   const saveProducts = useCallback(async (data: Product[]) => {
     await AsyncStorage.setItem(STORAGE_KEYS.products, JSON.stringify(data));
-  }, []);
-
-  const saveSalesInvoices = useCallback(async (data: SalesInvoice[]) => {
-    await AsyncStorage.setItem(STORAGE_KEYS.salesInvoices, JSON.stringify(data));
-  }, []);
-
-  const saveReturnInvoices = useCallback(async (data: ReturnInvoice[]) => {
-    await AsyncStorage.setItem(STORAGE_KEYS.returnInvoices, JSON.stringify(data));
-  }, []);
-
-  const saveTrashedInvoices = useCallback(async (data: SalesInvoice[]) => {
-    await AsyncStorage.setItem(STORAGE_KEYS.trashedInvoices, JSON.stringify(data));
-  }, []);
-
-  const saveTrashedReturns = useCallback(async (data: ReturnInvoice[]) => {
-    await AsyncStorage.setItem(STORAGE_KEYS.trashedReturns, JSON.stringify(data));
   }, []);
 
   const addCompany = useCallback(
@@ -345,8 +389,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [returnCounter]);
 
   const addSalesInvoice = useCallback(
-    (company: Company, customerName: string, items: Omit<SalesInvoiceItem, "id">[]) => {
+    async (company: Company, customerName: string, items: Omit<SalesInvoiceItem, "id">[]): Promise<SalesInvoice> => {
       const next = invoiceCounter + 1;
+      const creatorName = user ? `${user.firstName} ${user.lastName}`.trim() : "";
+      const creatorEmail = user?.email ?? "";
       const invoice: SalesInvoice = {
         id: generateId(),
         invoiceNumber: `INV-${String(next).padStart(4, "0")}`,
@@ -356,61 +402,73 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         date: new Date().toISOString(),
         items: items.map((item) => ({ ...item, id: generateId() })),
         total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+        creatorEmail,
+        creatorName,
       };
-      const updated = [...salesInvoices, invoice];
-      setSalesInvoices(updated);
-      saveSalesInvoices(updated);
+
+      setSalesInvoices((prev) => [...prev, invoice]);
       setInvoiceCounter(next);
       AsyncStorage.setItem(STORAGE_KEYS.invoiceCounter, String(next));
+
+      if (user?.email) {
+        await fetch(`${getApiBase()}/api/invoices`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: user.email, invoice }),
+        });
+      }
+
       return invoice;
     },
-    [invoiceCounter, salesInvoices, saveSalesInvoices]
+    [invoiceCounter, user]
   );
 
   const updateSalesInvoice = useCallback(
-    (id: string, company: Company, customerName: string, items: Omit<SalesInvoiceItem, "id">[]) => {
-      const existing = salesInvoices.find((inv) => inv.id === id);
-      if (!existing) throw new Error("Invoice not found");
-      const updated_invoice: SalesInvoice = {
-        ...existing,
-        companyId: company.id,
-        companyName: company.name,
-        customerName: customerName.trim(),
-        items: items.map((item) => ({ ...item, id: generateId() })),
-        total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
-      };
-      const updated = salesInvoices.map((inv) =>
-        inv.id === id ? updated_invoice : inv
-      );
-      setSalesInvoices(updated);
-      saveSalesInvoices(updated);
+    async (id: string, company: Company, customerName: string, items: Omit<SalesInvoiceItem, "id">[]): Promise<SalesInvoice> => {
+      let updated_invoice: SalesInvoice | null = null;
+
+      setSalesInvoices((prev) => {
+        const existing = prev.find((inv) => inv.id === id);
+        if (!existing) return prev;
+        updated_invoice = {
+          ...existing,
+          companyId: company.id,
+          companyName: company.name,
+          customerName: customerName.trim(),
+          items: items.map((item) => ({ ...item, id: generateId() })),
+          total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+        };
+        return prev.map((inv) => inv.id === id ? updated_invoice! : inv);
+      });
+
+      if (user?.email && updated_invoice) {
+        await fetch(`${getApiBase()}/api/invoices/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: user.email,
+            invoice: {
+              companyId: company.id,
+              companyName: company.name,
+              customerName: customerName.trim(),
+              items: items.map((item) => ({ ...item, id: generateId() })),
+              total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+            },
+          }),
+        });
+      }
+
+      if (!updated_invoice) throw new Error("Invoice not found");
       return updated_invoice;
     },
-    [salesInvoices, saveSalesInvoices]
-  );
-
-  const updateReturnInvoice = useCallback(
-    (id: string, company: Company, items: Omit<ReturnItem, "id">[]) => {
-      const existing = returnInvoices.find((r) => r.id === id);
-      if (!existing) throw new Error("Return not found");
-      const updated_return: ReturnInvoice = {
-        ...existing,
-        companyId: company.id,
-        companyName: company.name,
-        items: items.map((item) => ({ ...item, id: generateId() })),
-        total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
-      };
-      const updated = returnInvoices.map((r) => r.id === id ? updated_return : r);
-      setReturnInvoices(updated);
-      saveReturnInvoices(updated);
-      return updated_return;
-    },
-    [returnInvoices, saveReturnInvoices]
+    [user]
   );
 
   const addReturnInvoice = useCallback(
-    (originalInvoice: SalesInvoice, items: Omit<ReturnItem, "id">[]) => {
+    async (originalInvoice: SalesInvoice, items: Omit<ReturnItem, "id">[]): Promise<ReturnInvoice> => {
       const next = returnCounter + 1;
+      const creatorName = user ? `${user.firstName} ${user.lastName}`.trim() : "";
+      const creatorEmail = user?.email ?? "";
       const returnInv: ReturnInvoice = {
         id: generateId(),
         returnNumber: `RET-${String(next).padStart(4, "0")}`,
@@ -422,20 +480,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         date: new Date().toISOString(),
         items: items.map((item) => ({ ...item, id: generateId() })),
         total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+        creatorEmail,
+        creatorName,
       };
-      const updated = [...returnInvoices, returnInv];
-      setReturnInvoices(updated);
-      saveReturnInvoices(updated);
+
+      setReturnInvoices((prev) => [...prev, returnInv]);
       setReturnCounter(next);
       AsyncStorage.setItem(STORAGE_KEYS.returnCounter, String(next));
+
+      if (user?.email) {
+        await fetch(`${getApiBase()}/api/returns`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: user.email, ret: returnInv }),
+        });
+      }
+
       return returnInv;
     },
-    [returnCounter, returnInvoices, saveReturnInvoices]
+    [returnCounter, user]
   );
 
   const addStandaloneReturn = useCallback(
-    (company: Company, items: Omit<ReturnItem, "id">[]) => {
+    async (company: Company, items: Omit<ReturnItem, "id">[]): Promise<ReturnInvoice> => {
       const next = returnCounter + 1;
+      const creatorName = user ? `${user.firstName} ${user.lastName}`.trim() : "";
+      const creatorEmail = user?.email ?? "";
       const returnInv: ReturnInvoice = {
         id: generateId(),
         returnNumber: `RET-${String(next).padStart(4, "0")}`,
@@ -447,97 +517,186 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         date: new Date().toISOString(),
         items: items.map((item) => ({ ...item, id: generateId() })),
         total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+        creatorEmail,
+        creatorName,
       };
-      const updated = [...returnInvoices, returnInv];
-      setReturnInvoices(updated);
-      saveReturnInvoices(updated);
+
+      setReturnInvoices((prev) => [...prev, returnInv]);
       setReturnCounter(next);
       AsyncStorage.setItem(STORAGE_KEYS.returnCounter, String(next));
+
+      if (user?.email) {
+        await fetch(`${getApiBase()}/api/returns`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: user.email, ret: returnInv }),
+        });
+      }
+
       return returnInv;
     },
-    [returnCounter, returnInvoices, saveReturnInvoices]
+    [returnCounter, user]
+  );
+
+  const updateReturnInvoice = useCallback(
+    async (id: string, company: Company, items: Omit<ReturnItem, "id">[]): Promise<ReturnInvoice> => {
+      let updated_return: ReturnInvoice | null = null;
+
+      setReturnInvoices((prev) => {
+        const existing = prev.find((r) => r.id === id);
+        if (!existing) return prev;
+        updated_return = {
+          ...existing,
+          companyId: company.id,
+          companyName: company.name,
+          items: items.map((item) => ({ ...item, id: generateId() })),
+          total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+        };
+        return prev.map((r) => r.id === id ? updated_return! : r);
+      });
+
+      if (user?.email && updated_return) {
+        await fetch(`${getApiBase()}/api/returns/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: user.email,
+            ret: {
+              companyId: company.id,
+              companyName: company.name,
+              customerName: (updated_return as ReturnInvoice).customerName,
+              items: items.map((item) => ({ ...item, id: generateId() })),
+              total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+            },
+          }),
+        });
+      }
+
+      if (!updated_return) throw new Error("Return not found");
+      return updated_return;
+    },
+    [user]
   );
 
   const deleteSalesInvoice = useCallback(
-    (id: string) => {
-      const item = salesInvoices.find((inv) => inv.id === id);
-      if (!item) return;
-      const updatedActive = salesInvoices.filter((inv) => inv.id !== id);
-      const updatedTrash = [...trashedInvoices, item];
-      setSalesInvoices(updatedActive);
-      setTrashedInvoices(updatedTrash);
-      saveSalesInvoices(updatedActive);
-      saveTrashedInvoices(updatedTrash);
+    async (id: string) => {
+      setSalesInvoices((prev) => {
+        const item = prev.find((inv) => inv.id === id);
+        if (!item) return prev;
+        setTrashedInvoices((t) => [...t, item]);
+        return prev.filter((inv) => inv.id !== id);
+      });
+
+      if (user?.email) {
+        await fetch(`${getApiBase()}/api/invoices/${id}?email=${encodeURIComponent(user.email)}`, {
+          method: "DELETE",
+        });
+      }
     },
-    [salesInvoices, trashedInvoices, saveSalesInvoices, saveTrashedInvoices]
+    [user]
   );
 
   const deleteReturnInvoice = useCallback(
-    (id: string) => {
-      const item = returnInvoices.find((r) => r.id === id);
-      if (!item) return;
-      const updatedActive = returnInvoices.filter((r) => r.id !== id);
-      const updatedTrash = [...trashedReturns, item];
-      setReturnInvoices(updatedActive);
-      setTrashedReturns(updatedTrash);
-      saveReturnInvoices(updatedActive);
-      saveTrashedReturns(updatedTrash);
+    async (id: string) => {
+      setReturnInvoices((prev) => {
+        const item = prev.find((r) => r.id === id);
+        if (!item) return prev;
+        setTrashedReturns((t) => [...t, item]);
+        return prev.filter((r) => r.id !== id);
+      });
+
+      if (user?.email) {
+        await fetch(`${getApiBase()}/api/returns/${id}?email=${encodeURIComponent(user.email)}`, {
+          method: "DELETE",
+        });
+      }
     },
-    [returnInvoices, trashedReturns, saveReturnInvoices, saveTrashedReturns]
+    [user]
   );
 
   const restoreSalesInvoice = useCallback(
-    (id: string) => {
-      const item = trashedInvoices.find((inv) => inv.id === id);
-      if (!item) return;
-      const updatedTrash = trashedInvoices.filter((inv) => inv.id !== id);
-      const updatedActive = [...salesInvoices, item];
-      setTrashedInvoices(updatedTrash);
-      setSalesInvoices(updatedActive);
-      saveTrashedInvoices(updatedTrash);
-      saveSalesInvoices(updatedActive);
+    async (id: string) => {
+      setTrashedInvoices((prev) => {
+        const item = prev.find((inv) => inv.id === id);
+        if (!item) return prev;
+        setSalesInvoices((a) => [...a, item]);
+        return prev.filter((inv) => inv.id !== id);
+      });
+
+      if (user?.email) {
+        await fetch(`${getApiBase()}/api/invoices/${id}/restore`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: user.email }),
+        });
+      }
     },
-    [trashedInvoices, salesInvoices, saveTrashedInvoices, saveSalesInvoices]
+    [user]
   );
 
   const restoreReturnInvoice = useCallback(
-    (id: string) => {
-      const item = trashedReturns.find((r) => r.id === id);
-      if (!item) return;
-      const updatedTrash = trashedReturns.filter((r) => r.id !== id);
-      const updatedActive = [...returnInvoices, item];
-      setTrashedReturns(updatedTrash);
-      setReturnInvoices(updatedActive);
-      saveTrashedReturns(updatedTrash);
-      saveReturnInvoices(updatedActive);
+    async (id: string) => {
+      setTrashedReturns((prev) => {
+        const item = prev.find((r) => r.id === id);
+        if (!item) return prev;
+        setReturnInvoices((a) => [...a, item]);
+        return prev.filter((r) => r.id !== id);
+      });
+
+      if (user?.email) {
+        await fetch(`${getApiBase()}/api/returns/${id}/restore`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: user.email }),
+        });
+      }
     },
-    [trashedReturns, returnInvoices, saveTrashedReturns, saveReturnInvoices]
+    [user]
   );
 
   const permanentlyDeleteInvoice = useCallback(
-    (id: string) => {
-      const updated = trashedInvoices.filter((inv) => inv.id !== id);
-      setTrashedInvoices(updated);
-      saveTrashedInvoices(updated);
+    async (id: string) => {
+      setTrashedInvoices((prev) => prev.filter((inv) => inv.id !== id));
+
+      if (user?.email) {
+        await fetch(`${getApiBase()}/api/invoices/${id}?email=${encodeURIComponent(user.email)}&permanent=true`, {
+          method: "DELETE",
+        });
+      }
     },
-    [trashedInvoices, saveTrashedInvoices]
+    [user]
   );
 
   const permanentlyDeleteReturn = useCallback(
-    (id: string) => {
-      const updated = trashedReturns.filter((r) => r.id !== id);
-      setTrashedReturns(updated);
-      saveTrashedReturns(updated);
+    async (id: string) => {
+      setTrashedReturns((prev) => prev.filter((r) => r.id !== id));
+
+      if (user?.email) {
+        await fetch(`${getApiBase()}/api/returns/${id}?email=${encodeURIComponent(user.email)}&permanent=true`, {
+          method: "DELETE",
+        });
+      }
     },
-    [trashedReturns, saveTrashedReturns]
+    [user]
   );
 
-  const emptyTrash = useCallback(() => {
+  const emptyTrash = useCallback(async () => {
+    const invIds = trashedInvoices.map((i) => i.id);
+    const retIds = trashedReturns.map((r) => r.id);
     setTrashedInvoices([]);
     setTrashedReturns([]);
-    saveTrashedInvoices([]);
-    saveTrashedReturns([]);
-  }, [saveTrashedInvoices, saveTrashedReturns]);
+
+    if (user?.email) {
+      await Promise.all([
+        ...invIds.map((id) =>
+          fetch(`${getApiBase()}/api/invoices/${id}?email=${encodeURIComponent(user.email!)}&permanent=true`, { method: "DELETE" })
+        ),
+        ...retIds.map((id) =>
+          fetch(`${getApiBase()}/api/returns/${id}?email=${encodeURIComponent(user.email!)}&permanent=true`, { method: "DELETE" })
+        ),
+      ]);
+    }
+  }, [trashedInvoices, trashedReturns, user]);
 
   const value = useMemo(
     () => ({
@@ -548,6 +707,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       trashedInvoices,
       trashedReturns,
       isLoading,
+      isSyncing,
       addCompany,
       updateCompany,
       deleteCompany,
@@ -570,6 +730,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       emptyTrash,
       getNextInvoiceNumber,
       getNextReturnNumber,
+      refreshFromServer: fetchFromServer,
     }),
     [
       companies,
@@ -579,6 +740,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       trashedInvoices,
       trashedReturns,
       isLoading,
+      isSyncing,
       addCompany,
       updateCompany,
       deleteCompany,
@@ -601,6 +763,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       emptyTrash,
       getNextInvoiceNumber,
       getNextReturnNumber,
+      fetchFromServer,
     ]
   );
 

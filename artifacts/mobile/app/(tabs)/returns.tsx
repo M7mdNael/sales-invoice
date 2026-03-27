@@ -164,6 +164,9 @@ function ReturnCard({ ret, isRTL, onDelete }: { ret: ReturnInvoice; isRTL: boole
         <Text style={[styles.cardRef, isRTL && styles.textRTL]}>
           Ref: {ret.originalInvoiceNumber}
         </Text>
+        {!!ret.creatorName && (
+          <Text style={[styles.cardCreator, isRTL && styles.textRTL]}>By {ret.creatorName}</Text>
+        )}
       </View>
       <Pressable style={styles.cardTrashBtn} onPress={(e) => { e.stopPropagation?.(); onDelete(); }}>
         <Feather name="trash-2" size={16} color={C.danger} />
@@ -279,6 +282,7 @@ const styles = StyleSheet.create({
   cardCustomer: { fontSize: 13, fontFamily: "Inter_400Regular", color: C.textSecondary },
   cardDate: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textMuted },
   cardRef: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textMuted, marginTop: 2 },
+  cardCreator: { fontSize: 11, fontFamily: "Inter_400Regular", color: C.textMuted, marginTop: 1 },
   empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 80 },
   emptyIcon: {
     width: 80, height: 80, borderRadius: 24, backgroundColor: C.dangerLight,
