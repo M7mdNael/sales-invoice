@@ -53,7 +53,7 @@ Offline Sales & Sales Return invoicing system built with Expo React Native.
 - Stored: products, salesInvoices, returnInvoices, counters
 
 ### Navigation Structure
-- `app/(tabs)/` — Home, Invoices, Returns, Reports tabs with NativeTabs (iOS 26) / classic Tabs fallback
+- `app/(tabs)/` — Home, Invoices, Returns, Reports tabs using standard Expo Router Tabs with cross-platform icons (Feather + MaterialCommunityIcons)
 - `app/invoice/create.tsx` — Create sales invoice (modal)
 - `app/invoice/[id].tsx` — Invoice details + PDF share + create return
 - `app/return/create.tsx` — Create return invoice (modal), select invoice
@@ -90,3 +90,6 @@ Runs on port 8080 (localhost), workflow: "Start Backend API".
 - API server dev script sets PORT to 8080 by default if not provided
 - Mobile Expo app runs on port 18115 with QR code for Expo Go
 - The mockup-sandbox artifact runs on port 8081 for UI prototyping
+- Metro config (`metro.config.js`) explicitly sets absolute `projectRoot` and `watchFolders` for pnpm monorepo compatibility; this ensures the native bundle resolves the entry point from the mobile app directory, not the workspace root
+- Removed `expo-router/unstable-native-tabs`, `expo-symbols`, and `expo-glass-effect` imports from the tabs layout — these require native iOS modules not available in Expo Go; tabs now use cross-platform Feather + MaterialCommunityIcons
+- `expo-glass-effect` and `expo-symbols` remain in package.json but are not imported anywhere
