@@ -73,6 +73,10 @@ function RootLayoutNav() {
         options={{ title: "Settings" }}
       />
       <Stack.Screen
+        name="workspace/index"
+        options={{ title: "Workspace" }}
+      />
+      <Stack.Screen
         name="trash"
         options={{ title: "Trash" }}
       />

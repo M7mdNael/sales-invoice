@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import * as Clipboard from "expo-clipboard";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
@@ -14,7 +14,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
-import { useApp } from "@/context/AppContext";
 import { useLang } from "@/context/LanguageContext";
 import { useUser } from "@/context/UserContext";
 
@@ -22,19 +21,15 @@ const C = Colors.light;
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { t, lang, isRTL, setLang } = useLang();
-  const { user, updateProfile, joinWorkspace, refreshWorkspace, logout } = useUser();
-  const { isSyncing, refreshFromServer } = useApp();
+  const { user, updateProfile, logout } = useUser();
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom + 16;
 
   const [editingProfile, setEditingProfile] = useState(false);
   const [firstName, setFirstName] = useState(user?.firstName ?? "");
   const [lastName, setLastName] = useState(user?.lastName ?? "");
   const [saving, setSaving] = useState(false);
-
-  const [joinCode, setJoinCode] = useState("");
-  const [joiningWorkspace, setJoiningWorkspace] = useState(false);
-  const [copiedCode, setCopiedCode] = useState(false);
 
   const handleSetLanguage = async (newLang: "en" | "ar") => {
     if (newLang === lang) return;
@@ -53,6 +48,10 @@ export default function SettingsScreen() {
       Alert.alert("Name Required", "Please enter your first name.");
       return;
     }
+    if (!lastName.trim()) {
+      Alert.alert("Last Name Required", "Please enter your last name.");
+      return;
+    }
     setSaving(true);
     try {
       await updateProfile(user?.phone ?? "", firstName.trim(), lastName.trim(), user?.email ?? "");
@@ -60,37 +59,6 @@ export default function SettingsScreen() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleCopyInviteCode = async () => {
-    if (!user?.inviteCode) return;
-    await Clipboard.setStringAsync(user.inviteCode);
-    setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2000);
-  };
-
-  const handleJoinWorkspace = async () => {
-    const code = joinCode.trim().toUpperCase();
-    if (!code) {
-      Alert.alert("Missing Code", "Please enter an invite code.");
-      return;
-    }
-    setJoiningWorkspace(true);
-    try {
-      await joinWorkspace(code);
-      setJoinCode("");
-      await refreshFromServer();
-      Alert.alert("Workspace Joined", "You have joined the shared workspace. Invoices will now sync.");
-    } catch (err: any) {
-      Alert.alert("Failed", err?.message ?? "Invalid invite code. Please try again.");
-    } finally {
-      setJoiningWorkspace(false);
-    }
-  };
-
-  const handleRefreshSync = async () => {
-    await refreshWorkspace();
-    await refreshFromServer();
   };
 
   const handleLogout = () => {
@@ -116,7 +84,6 @@ export default function SettingsScreen() {
 
         {editingProfile ? (
           <View style={styles.card}>
-            {/* Verified email — read-only */}
             <Text style={[styles.fieldLabel, isRTL && styles.textRTL]}>EMAIL ADDRESS</Text>
             <View style={styles.emailLockedRow}>
               <Feather name="mail" size={15} color={C.textMuted} />
@@ -151,7 +118,7 @@ export default function SettingsScreen() {
                 setFirstName(user?.firstName ?? "");
                 setLastName(user?.lastName ?? "");
                 setEditingProfile(false);
-              }} >
+              }}>
                 <Text style={styles.cancelBtnText}>{t("cancel")}</Text>
               </Pressable>
               <Pressable style={[styles.saveBtn, saving && styles.saveBtnDisabled]} onPress={handleSaveProfile} disabled={saving}>
@@ -198,71 +165,25 @@ export default function SettingsScreen() {
         )}
       </View>
 
-      {/* Workspace Section */}
+      {/* Quick Links */}
       <View style={styles.section}>
-        <View style={[styles.sectionHeader, isRTL && styles.sectionHeaderRTL]}>
-          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Workspace Sync</Text>
-          <Pressable
-            style={[styles.syncBtn, isSyncing && styles.syncBtnDisabled]}
-            onPress={handleRefreshSync}
-            disabled={isSyncing}
-          >
-            <Feather name="refresh-cw" size={13} color={C.tint} />
-            <Text style={styles.syncBtnText}>{isSyncing ? "Syncing..." : "Sync"}</Text>
-          </Pressable>
-        </View>
-        <Text style={[styles.sectionDesc, isRTL && styles.textRTL]}>
-          Share invoices and returns with a teammate using a workspace invite code.
-        </Text>
+        <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>Workspace</Text>
 
-        {user?.inviteCode ? (
-          <View style={styles.inviteCard}>
-            <View style={styles.inviteTop}>
-              <View style={styles.inviteIcon}>
-                <Feather name="users" size={16} color="#1A73E8" />
-              </View>
-              <View style={styles.inviteInfo}>
-                <Text style={styles.inviteLabel}>YOUR INVITE CODE</Text>
-                <Text style={styles.inviteCode}>{user.inviteCode}</Text>
-              </View>
-              <Pressable style={[styles.copyBtn, copiedCode && styles.copyBtnDone]} onPress={handleCopyInviteCode}>
-                <Feather name={copiedCode ? "check" : "copy"} size={14} color={copiedCode ? C.success : C.tint} />
-                <Text style={[styles.copyBtnText, copiedCode && styles.copyBtnTextDone]}>
-                  {copiedCode ? "Copied!" : "Copy"}
-                </Text>
-              </Pressable>
+        <Pressable
+          style={[styles.navRow, isRTL && styles.navRowRTL]}
+          onPress={() => router.push("/workspace")}
+        >
+          <View style={styles.navLeft}>
+            <View style={[styles.navIcon, { backgroundColor: "#DBEAFE" }]}>
+              <Feather name="users" size={16} color="#1A73E8" />
             </View>
-            <Text style={styles.inviteHint}>
-              Share this code with a colleague so they can join your workspace and see shared invoices.
-            </Text>
+            <View>
+              <Text style={styles.navLabel}>Workspace & Members</Text>
+              <Text style={styles.navSub}>Invite code · Member logs · Join workspace</Text>
+            </View>
           </View>
-        ) : null}
-
-        <View style={styles.joinCard}>
-          <Text style={[styles.fieldLabel, isRTL && styles.textRTL]}>JOIN A WORKSPACE</Text>
-          <View style={styles.joinRow}>
-            <TextInput
-              style={[styles.joinInput, isRTL && styles.inputRTL]}
-              value={joinCode}
-              onChangeText={(v) => setJoinCode(v.toUpperCase())}
-              placeholder="Enter invite code"
-              placeholderTextColor={C.textMuted}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              textAlign={isRTL ? "right" : "left"}
-              returnKeyType="done"
-              onSubmitEditing={handleJoinWorkspace}
-            />
-            <Pressable
-              style={[styles.joinBtn, (!joinCode.trim() || joiningWorkspace) && styles.joinBtnDisabled]}
-              onPress={handleJoinWorkspace}
-              disabled={!joinCode.trim() || joiningWorkspace}
-            >
-              <Feather name="arrow-right" size={16} color="#fff" />
-              <Text style={styles.joinBtnText}>{joiningWorkspace ? "Joining..." : "Join"}</Text>
-            </Pressable>
-          </View>
-        </View>
+          <Feather name={isRTL ? "chevron-left" : "chevron-right"} size={18} color={C.textMuted} />
+        </Pressable>
       </View>
 
       {/* Language Section */}
@@ -345,13 +266,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 17, fontFamily: "Inter_700Bold", color: C.text, marginBottom: 12,
   },
-  sectionHeader: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8,
-  },
-  sectionHeaderRTL: { flexDirection: "row-reverse" },
-  sectionDesc: {
-    fontSize: 13, fontFamily: "Inter_400Regular", color: C.textMuted, lineHeight: 18, marginBottom: 12,
-  },
   textRTL: { textAlign: "right" },
 
   profileCard: {
@@ -400,54 +314,19 @@ const styles = StyleSheet.create({
   saveBtnDisabled: { opacity: 0.6 },
   saveBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
 
-  syncBtn: {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: C.tintLight, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6,
-  },
-  syncBtnDisabled: { opacity: 0.5 },
-  syncBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.tint },
-
-  inviteCard: {
-    backgroundColor: C.card, borderRadius: 14, padding: 14, marginBottom: 12,
+  navRow: {
+    backgroundColor: C.card, borderRadius: 14, padding: 14,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     shadowColor: C.shadow, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 1, shadowRadius: 3, elevation: 1,
-    borderWidth: 1.5, borderColor: "#DBEAFE",
   },
-  inviteTop: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 10 },
-  inviteIcon: {
-    width: 36, height: 36, borderRadius: 10, backgroundColor: "#DBEAFE",
+  navRowRTL: { flexDirection: "row-reverse" },
+  navLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  navIcon: {
+    width: 38, height: 38, borderRadius: 11,
     justifyContent: "center", alignItems: "center",
   },
-  inviteInfo: { flex: 1 },
-  inviteLabel: {
-    fontSize: 10, fontFamily: "Inter_600SemiBold", color: C.textMuted,
-    letterSpacing: 0.5, textTransform: "uppercase",
-  },
-  inviteCode: { fontSize: 20, fontFamily: "Inter_700Bold", color: C.text, letterSpacing: 3, marginTop: 2 },
-  copyBtn: {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: C.tintLight, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7,
-  },
-  copyBtnDone: { backgroundColor: C.successLight },
-  copyBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: C.tint },
-  copyBtnTextDone: { color: C.success },
-  inviteHint: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textMuted, lineHeight: 17 },
-
-  joinCard: {
-    backgroundColor: C.card, borderRadius: 14, padding: 14,
-    shadowColor: C.shadow, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 1, shadowRadius: 3, elevation: 1,
-  },
-  joinRow: { flexDirection: "row", gap: 10, alignItems: "center" },
-  joinInput: {
-    flex: 1, backgroundColor: C.background, borderRadius: 12, padding: 12, fontSize: 15,
-    fontFamily: "Inter_600SemiBold", color: C.text, borderWidth: 1, borderColor: C.border,
-    letterSpacing: 2,
-  },
-  joinBtn: {
-    flexDirection: "row", alignItems: "center", gap: 6,
-    backgroundColor: C.tint, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
-  },
-  joinBtnDisabled: { opacity: 0.5 },
-  joinBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  navLabel: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: C.text },
+  navSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textMuted, marginTop: 2 },
 
   optionRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
