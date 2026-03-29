@@ -81,7 +81,13 @@ export default function OnboardingScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: trimmed }),
       });
-      const data = await res.json();
+      const rawText = await res.text();
+      let data: any;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error("Could not reach the server. Please try again.");
+      }
       if (!res.ok) throw new Error(data.error ?? "Failed to send code.");
       setCodeSent(true);
       setResendCooldown(60);
