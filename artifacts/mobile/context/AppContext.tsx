@@ -8,6 +8,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { AppState } from "react-native";
 import { UserContext } from "./UserContext";
 import { getApiBase } from "@/utils/api";
 
@@ -192,22 +193,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const lastFetchedEmail = useRef<string | null>(null);
+  const invoiceCounterRef = useRef(0);
+  const returnCounterRef = useRef(0);
+  const isFetchingRef = useRef(false);
 
   const fetchFromServer = useCallback(async () => {
     if (!user?.email) return;
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     setIsSyncing(true);
     try {
-      const [invRes, retRes] = await Promise.all([
+      const [invRes, retRes, trashInvRes, trashRetRes] = await Promise.all([
         fetch(`${getApiBase()}/api/invoices?email=${encodeURIComponent(user.email)}`),
         fetch(`${getApiBase()}/api/returns?email=${encodeURIComponent(user.email)}`),
-      ]);
-      const [invData, retData] = await Promise.all([invRes.json(), retRes.json()]);
-
-      const [trashInvRes, trashRetRes] = await Promise.all([
         fetch(`${getApiBase()}/api/invoices?email=${encodeURIComponent(user.email)}&deleted=true`),
         fetch(`${getApiBase()}/api/returns?email=${encodeURIComponent(user.email)}&deleted=true`),
       ]);
-      const [trashInvData, trashRetData] = await Promise.all([trashInvRes.json(), trashRetRes.json()]);
+      const [invData, retData, trashInvData, trashRetData] = await Promise.all([
+        invRes.json(), retRes.json(), trashInvRes.json(), trashRetRes.json(),
+      ]);
 
       if (invData.invoices) setSalesInvoices(invData.invoices.map(migrateSalesInvoice));
       if (retData.returns) setReturnInvoices(retData.returns.map(migrateReturnInvoice));
@@ -221,7 +225,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
       if (allInvNums.length > 0) {
         const maxInv = Math.max(...allInvNums);
-        if (maxInv > invoiceCounter) {
+        if (maxInv > invoiceCounterRef.current) {
+          invoiceCounterRef.current = maxInv;
           setInvoiceCounter(maxInv);
           AsyncStorage.setItem(STORAGE_KEYS.invoiceCounter, String(maxInv));
         }
@@ -234,7 +239,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
       if (allRetNums.length > 0) {
         const maxRet = Math.max(...allRetNums);
-        if (maxRet > returnCounter) {
+        if (maxRet > returnCounterRef.current) {
+          returnCounterRef.current = maxRet;
           setReturnCounter(maxRet);
           AsyncStorage.setItem(STORAGE_KEYS.returnCounter, String(maxRet));
         }
@@ -243,8 +249,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       console.error("fetchFromServer error:", e);
     } finally {
       setIsSyncing(false);
+      isFetchingRef.current = false;
     }
-  }, [user?.email, invoiceCounter, returnCounter]);
+  }, [user?.email]);
 
   useEffect(() => {
     const load = async () => {
@@ -257,8 +264,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ]);
         if (c) setCompanies(JSON.parse(c).map(migrateCompany));
         if (p) setProducts(JSON.parse(p));
-        if (ic) setInvoiceCounter(parseInt(ic, 10));
-        if (rc) setReturnCounter(parseInt(rc, 10));
+        if (ic) {
+          const n = parseInt(ic, 10);
+          setInvoiceCounter(n);
+          invoiceCounterRef.current = n;
+        }
+        if (rc) {
+          const n = parseInt(rc, 10);
+          setReturnCounter(n);
+          returnCounterRef.current = n;
+        }
       } catch (e) {
         console.error("Failed to load local data", e);
       } finally {
@@ -274,6 +289,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       fetchFromServer();
     }
   }, [isLoading, user?.email, fetchFromServer]);
+
+  useEffect(() => {
+    if (!user?.email) return;
+    const interval = setInterval(() => {
+      fetchFromServer();
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [user?.email, fetchFromServer]);
+
+  useEffect(() => {
+    if (!user?.email) return;
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        fetchFromServer();
+      }
+    });
+    return () => sub.remove();
+  }, [user?.email, fetchFromServer]);
 
   const saveCompanies = useCallback(async (data: Company[]) => {
     await AsyncStorage.setItem(STORAGE_KEYS.companies, JSON.stringify(data));
@@ -408,6 +441,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       setSalesInvoices((prev) => [...prev, invoice]);
       setInvoiceCounter(next);
+      invoiceCounterRef.current = next;
       AsyncStorage.setItem(STORAGE_KEYS.invoiceCounter, String(next));
 
       if (user?.email) {
@@ -416,11 +450,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: user.email, invoice }),
         });
+        fetchFromServer();
       }
 
       return invoice;
     },
-    [invoiceCounter, user]
+    [invoiceCounter, user, fetchFromServer]
   );
 
   const updateSalesInvoice = useCallback(
@@ -486,6 +521,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       setReturnInvoices((prev) => [...prev, returnInv]);
       setReturnCounter(next);
+      returnCounterRef.current = next;
       AsyncStorage.setItem(STORAGE_KEYS.returnCounter, String(next));
 
       if (user?.email) {
@@ -494,11 +530,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: user.email, ret: returnInv }),
         });
+        fetchFromServer();
       }
 
       return returnInv;
     },
-    [returnCounter, user]
+    [returnCounter, user, fetchFromServer]
   );
 
   const addStandaloneReturn = useCallback(
@@ -523,6 +560,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       setReturnInvoices((prev) => [...prev, returnInv]);
       setReturnCounter(next);
+      returnCounterRef.current = next;
       AsyncStorage.setItem(STORAGE_KEYS.returnCounter, String(next));
 
       if (user?.email) {
@@ -531,11 +569,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: user.email, ret: returnInv }),
         });
+        fetchFromServer();
       }
 
       return returnInv;
     },
-    [returnCounter, user]
+    [returnCounter, user, fetchFromServer]
   );
 
   const updateReturnInvoice = useCallback(
