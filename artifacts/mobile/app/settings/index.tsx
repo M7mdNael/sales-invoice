@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
@@ -22,6 +23,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { t, lang, isRTL, setLang } = useLang();
   const { user, updateProfile, logout } = useUser();
+  const router = useRouter();
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom + 16;
 
   const [editingProfile, setEditingProfile] = useState(false);
@@ -133,9 +135,17 @@ export default function SettingsScreen() {
               </Text>
             </View>
             <View style={styles.profileInfo}>
-              <Text style={[styles.profileName, isRTL && styles.textRTL]}>
-                {user?.firstName} {user?.lastName}
-              </Text>
+              <View style={styles.nameRow}>
+                <Text style={[styles.profileName, isRTL && styles.textRTL]}>
+                  {user?.firstName} {user?.lastName}
+                </Text>
+                {user?.isAdmin && (
+                  <View style={styles.adminBadge}>
+                    <Feather name="shield" size={10} color="#fff" />
+                    <Text style={styles.adminBadgeText}>Admin</Text>
+                  </View>
+                )}
+              </View>
               {user?.email ? (
                 <View style={styles.emailRow}>
                   <Feather name="mail" size={12} color={C.textMuted} />
@@ -156,6 +166,23 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
         )}
+      </View>
+
+      {/* Team Section */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>Team</Text>
+        <Pressable style={styles.navRow} onPress={() => router.push("/team")}>
+          <View style={styles.navRowLeft}>
+            <View style={[styles.navIcon, { backgroundColor: "#DBEAFE" }]}>
+              <Feather name="users" size={16} color={C.tint} />
+            </View>
+            <View>
+              <Text style={styles.navRowTitle}>Team Members</Text>
+              <Text style={styles.navRowSub}>View and manage your company team</Text>
+            </View>
+          </View>
+          <Feather name="chevron-right" size={18} color={C.textMuted} />
+        </Pressable>
       </View>
 
       {/* Language Section */}
@@ -239,6 +266,23 @@ const styles = StyleSheet.create({
     fontSize: 17, fontFamily: "Inter_700Bold", color: C.text, marginBottom: 12,
   },
   textRTL: { textAlign: "right" },
+
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
+  adminBadge: {
+    flexDirection: "row", alignItems: "center", gap: 3,
+    backgroundColor: C.tint, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2,
+  },
+  adminBadgeText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#fff" },
+
+  navRow: {
+    backgroundColor: C.card, borderRadius: 14, padding: 14,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    shadowColor: C.shadow, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 1, shadowRadius: 3, elevation: 1,
+  },
+  navRowLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  navIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center" },
+  navRowTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: C.text },
+  navRowSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textMuted, marginTop: 2 },
 
   profileCard: {
     backgroundColor: C.card, borderRadius: 16, padding: 16,

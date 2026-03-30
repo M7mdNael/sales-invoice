@@ -1,4 +1,4 @@
-import { pgTable, text, real, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, real, timestamp, boolean } from "drizzle-orm/pg-core";
 
 export const usersTable = pgTable("users", {
   email: text("email").primaryKey(),
@@ -52,6 +52,15 @@ export const returnsTable = pgTable("returns", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const employeesTable = pgTable("employees", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull().default(""),
+  isAdmin: boolean("is_admin").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const companiesTable = pgTable("companies", {
   id: text("id").primaryKey(),
   workspaceId: text("workspace_id").notNull(),
@@ -78,3 +87,4 @@ export type Invoice = typeof invoicesTable.$inferSelect;
 export type Return = typeof returnsTable.$inferSelect;
 export type CompanyRow = typeof companiesTable.$inferSelect;
 export type ProductRow = typeof productsTable.$inferSelect;
+export type Employee = typeof employeesTable.$inferSelect;

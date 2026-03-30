@@ -1,36 +1,18 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usersTable, workspacesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { usersTable, workspacesTable, employeesTable } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 const router = Router();
 
-function generateInviteCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-}
-
-async function getUniqueInviteCode(): Promise<string> {
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const code = generateInviteCode();
-    const existing = await db.select().from(workspacesTable).where(eq(workspacesTable.inviteCode, code)).limit(1);
-    if (existing.length === 0) return code;
-  }
-  return randomUUID().replace(/-/g, "").substring(0, 6).toUpperCase();
-}
-
 router.post("/auth/register", async (req, res) => {
   try {
-    const { email, firstName, lastName, phone } = req.body as {
+    const { email, firstName, lastName, employeeId } = req.body as {
       email?: string;
       firstName?: string;
       lastName?: string;
-      phone?: string;
+      employeeId?: string;
     };
 
     if (!email || !firstName) {
@@ -39,50 +21,78 @@ router.post("/auth/register", async (req, res) => {
     }
 
     const emailKey = email.trim().toLowerCase();
+    const first = firstName.trim();
+    const last = (lastName ?? "").trim();
 
     const existing = await db.select().from(usersTable).where(eq(usersTable.email, emailKey)).limit(1);
-
     let workspaceId: string;
-    let inviteCode: string;
 
     if (existing.length > 0 && existing[0].workspaceId) {
       workspaceId = existing[0].workspaceId;
-      const ws = await db.select().from(workspacesTable).where(eq(workspacesTable.id, workspaceId)).limit(1);
-      inviteCode = ws[0]?.inviteCode ?? "";
-
-      await db.update(usersTable).set({
-        firstName: firstName.trim(),
-        lastName: (lastName ?? "").trim(),
-        phone: (phone ?? "").trim(),
-      }).where(eq(usersTable.email, emailKey));
     } else {
-      inviteCode = await getUniqueInviteCode();
       workspaceId = randomUUID();
-
       await db.insert(workspacesTable).values({
         id: workspaceId,
-        inviteCode,
+        inviteCode: randomUUID().replace(/-/g, "").substring(0, 6).toUpperCase(),
         ownerEmail: emailKey,
       }).onConflictDoNothing();
 
       await db.insert(usersTable).values({
         email: emailKey,
-        firstName: firstName.trim(),
-        lastName: (lastName ?? "").trim(),
-        phone: (phone ?? "").trim(),
+        firstName: first,
+        lastName: last,
+        phone: "",
         workspaceId,
       }).onConflictDoUpdate({
         target: usersTable.email,
-        set: {
-          firstName: firstName.trim(),
-          lastName: (lastName ?? "").trim(),
-          phone: (phone ?? "").trim(),
-          workspaceId,
-        },
+        set: { workspaceId },
       });
     }
 
-    res.json({ success: true, workspaceId, inviteCode });
+    const existingEmployees = await db.select().from(employeesTable)
+      .where(eq(employeesTable.email, emailKey));
+    const isFirstEmployee = existingEmployees.length === 0;
+
+    let resolvedEmployeeId: string;
+    let isAdmin: boolean;
+
+    if (employeeId) {
+      const existingEmp = await db.select().from(employeesTable)
+        .where(and(eq(employeesTable.id, employeeId), eq(employeesTable.email, emailKey)))
+        .limit(1);
+
+      if (existingEmp.length > 0) {
+        await db.update(employeesTable).set({ firstName: first, lastName: last })
+          .where(eq(employeesTable.id, employeeId));
+        resolvedEmployeeId = employeeId;
+        isAdmin = existingEmp[0].isAdmin;
+      } else {
+        resolvedEmployeeId = employeeId;
+        isAdmin = isFirstEmployee;
+        await db.insert(employeesTable).values({
+          id: resolvedEmployeeId,
+          email: emailKey,
+          firstName: first,
+          lastName: last,
+          isAdmin,
+        }).onConflictDoUpdate({
+          target: employeesTable.id,
+          set: { firstName: first, lastName: last },
+        });
+      }
+    } else {
+      resolvedEmployeeId = randomUUID();
+      isAdmin = isFirstEmployee;
+      await db.insert(employeesTable).values({
+        id: resolvedEmployeeId,
+        email: emailKey,
+        firstName: first,
+        lastName: last,
+        isAdmin,
+      });
+    }
+
+    res.json({ success: true, workspaceId, employeeId: resolvedEmployeeId, isAdmin });
   } catch (err: any) {
     console.error("auth/register error:", err?.message ?? err);
     res.status(500).json({ error: "Registration failed. Please try again." });
@@ -103,15 +113,7 @@ router.get("/auth/profile", async (req, res) => {
       return;
     }
 
-    const user = users[0];
-    let inviteCode = "";
-
-    if (user.workspaceId) {
-      const ws = await db.select().from(workspacesTable).where(eq(workspacesTable.id, user.workspaceId)).limit(1);
-      inviteCode = ws[0]?.inviteCode ?? "";
-    }
-
-    res.json({ ...user, inviteCode });
+    res.json({ ...users[0] });
   } catch (err: any) {
     console.error("auth/profile error:", err?.message ?? err);
     res.status(500).json({ error: "Failed to load profile." });

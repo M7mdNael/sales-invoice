@@ -9,10 +9,20 @@ import React, {
 } from "react";
 import { getApiBase } from "@/utils/api";
 
+function generateUUID(): string {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export interface UserProfile {
   firstName: string;
   lastName: string;
   email: string;
+  employeeId: string;
+  isAdmin: boolean;
 }
 
 interface UserContextValue {
@@ -26,6 +36,15 @@ interface UserContextValue {
 export const UserContext = createContext<UserContextValue | null>(null);
 
 const USER_KEY = "@invoice_app/user_profile";
+const DEVICE_ID_KEY = "@invoice_app/device_id";
+
+async function getOrCreateDeviceId(): Promise<string> {
+  const existing = await AsyncStorage.getItem(DEVICE_ID_KEY);
+  if (existing) return existing;
+  const newId = generateUUID();
+  await AsyncStorage.setItem(DEVICE_ID_KEY, newId);
+  return newId;
+}
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -36,7 +55,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (raw) {
         try {
           const parsed = JSON.parse(raw);
-          setUser({ email: "", firstName: "", lastName: "", ...parsed });
+          setUser({ email: "", firstName: "", lastName: "", employeeId: "", isAdmin: false, ...parsed });
         } catch {
           setUser(null);
         }
@@ -51,6 +70,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     email: string,
   ) => {
     const emailKey = email.trim().toLowerCase();
+    const deviceId = await getOrCreateDeviceId();
+
     const res = await fetch(`${getApiBase()}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -58,7 +79,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         email: emailKey,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        phone: "",
+        employeeId: deviceId,
       }),
     });
     const data = await res.json();
@@ -68,6 +89,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       email: emailKey,
+      employeeId: data.employeeId ?? deviceId,
+      isAdmin: data.isAdmin ?? false,
     };
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(profile));
     setUser(profile);
@@ -78,26 +101,34 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     lastName: string,
   ) => {
     if (!user?.email) return;
+    const deviceId = await getOrCreateDeviceId();
+
     try {
-      await fetch(`${getApiBase()}/api/auth/register`, {
+      const res = await fetch(`${getApiBase()}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: user.email,
           firstName: firstName.trim(),
           lastName: lastName.trim(),
-          phone: "",
+          employeeId: deviceId,
         }),
       });
-    } catch {}
-
-    const profile: UserProfile = {
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      email: user.email,
-    };
-    await AsyncStorage.setItem(USER_KEY, JSON.stringify(profile));
-    setUser(profile);
+      const data = await res.json();
+      const profile: UserProfile = {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: user.email,
+        employeeId: data.employeeId ?? user.employeeId,
+        isAdmin: data.isAdmin ?? user.isAdmin,
+      };
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(profile));
+      setUser(profile);
+    } catch {
+      const profile: UserProfile = { ...user, firstName: firstName.trim(), lastName: lastName.trim() };
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(profile));
+      setUser(profile);
+    }
   }, [user]);
 
   const logout = useCallback(async () => {

@@ -73,6 +73,10 @@ function RootLayoutNav() {
         options={{ title: "Settings" }}
       />
       <Stack.Screen
+        name="team/index"
+        options={{ title: "Team" }}
+      />
+      <Stack.Screen
         name="trash"
         options={{ title: "Trash" }}
       />

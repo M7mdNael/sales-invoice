@@ -7,6 +7,7 @@ import invoicesRouter from "./invoices";
 import returnsRouter from "./returns";
 import companiesRouter from "./companies";
 import productsRouter from "./products";
+import teamRouter from "./team";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(invoicesRouter);
 router.use(returnsRouter);
 router.use(companiesRouter);
 router.use(productsRouter);
+router.use(teamRouter);
 
 export default router;

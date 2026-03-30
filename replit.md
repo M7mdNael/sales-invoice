@@ -35,10 +35,11 @@ Cloud-synced Sales & Sales Return invoicing system built with Expo React Native.
 
 ### Features
 - **OTP Email Verification**: 6-digit code sent via Resend at signup
-- **User Profile**: First name, last name (required), phone number (unique ID)
-- **Workspaces**: Each user gets a workspace; share via invite code so two users see the same invoices/returns
+- **Multi-Employee Model**: One shared email per company; each device registers its own name. First device = admin. All employees share invoices/returns/companies/products via cloud sync
+- **Employee Identity**: Device UUID stored in AsyncStorage as `employeeId`; sent to server on registration to upsert the employee record
+- **Team Screen**: Lists all team members with invoice/return activity counts, admin badge, "You" badge. Admin can remove non-admin members
 - **Products**: Add, edit, delete products with name and price (JOD)
-- **Companies**: Company management with member invite by phone
+- **Companies**: Company management (cloud-synced)
 - **Sales Invoices**: Create/edit invoices with customer name, products, auto-total in JOD (INV-0001…); synced to cloud
 - **Sales Returns**: Standalone returns tied to company (RET-0001…); synced to cloud
 - **Creator Tracking**: Each invoice/return stores `creatorEmail` + `creatorName` (shown in list view)
@@ -47,7 +48,7 @@ Cloud-synced Sales & Sales Return invoicing system built with Expo React Native.
 - **Reports**: Total Sales, Total Returns, Net Revenue in JOD
 - **PDF Export & Share**: Generate HTML→PDF via expo-print, share via expo-sharing
 - **Bilingual**: English / Arabic with RTL support
-- **Settings**: Workspace invite code display + copy, join workspace by code, sync button
+- **Settings**: Profile edit, admin badge, Team Members link, language selector, sign out
 
 ### Data Persistence
 - **Cloud**: PostgreSQL via Express API (invoices, returns)
@@ -99,8 +100,11 @@ Express 5 backend on port 8080. Workflow: "Start Backend API".
 
 - `users` — email (PK), firstName, lastName, phone, workspaceId
 - `workspaces` — id (UUID), inviteCode (unique 6-char), ownerEmail
+- `employees` — id (device UUID, PK), email (company email), firstName, lastName, isAdmin (bool), createdAt
 - `invoices` — id, workspaceId, invoiceNumber, companyId/Name, customerName, date, itemsJson, total, creatorEmail, creatorName, deletedAt
 - `returns` — same shape as invoices + originalInvoiceId/Number
+- `companies` — id, workspaceId, name, notes, createdAt, updatedAt
+- `products` — id, workspaceId, name, price, createdAt, updatedAt
 
 ## Workflows
 
