@@ -1,5 +1,4 @@
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
@@ -21,7 +20,6 @@ const C = Colors.light;
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const { t, lang, isRTL, setLang } = useLang();
   const { user, updateProfile, logout } = useUser();
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom + 16;
@@ -54,7 +52,7 @@ export default function SettingsScreen() {
     }
     setSaving(true);
     try {
-      await updateProfile(user?.phone ?? "", firstName.trim(), lastName.trim(), user?.email ?? "");
+      await updateProfile(firstName.trim(), lastName.trim());
       setEditingProfile(false);
     } finally {
       setSaving(false);
@@ -138,21 +136,16 @@ export default function SettingsScreen() {
               <Text style={[styles.profileName, isRTL && styles.textRTL]}>
                 {user?.firstName} {user?.lastName}
               </Text>
-              <View style={styles.phoneRow}>
-                <Feather name="phone" size={12} color={C.textMuted} />
-                <Text style={styles.profilePhone}>{user?.phone}</Text>
-              </View>
               {user?.email ? (
-                <View style={styles.phoneRow}>
+                <View style={styles.emailRow}>
                   <Feather name="mail" size={12} color={C.textMuted} />
-                  <Text style={styles.profilePhone}>{user.email}</Text>
+                  <Text style={styles.profileEmail}>{user.email}</Text>
                   <View style={styles.verifiedBadge}>
                     <Feather name="shield" size={10} color={C.success} />
                     <Text style={styles.verifiedBadgeText}>Verified</Text>
                   </View>
                 </View>
               ) : null}
-              <Text style={styles.profileIdHint}>Phone is your unique ID</Text>
             </View>
             <Pressable style={styles.editProfileBtn} onPress={() => {
               setFirstName(user?.firstName ?? "");
@@ -163,27 +156,6 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
         )}
-      </View>
-
-      {/* Quick Links */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, isRTL && styles.textRTL]}>Workspace</Text>
-
-        <Pressable
-          style={[styles.navRow, isRTL && styles.navRowRTL]}
-          onPress={() => router.push("/workspace")}
-        >
-          <View style={styles.navLeft}>
-            <View style={[styles.navIcon, { backgroundColor: "#DBEAFE" }]}>
-              <Feather name="users" size={16} color="#1A73E8" />
-            </View>
-            <View>
-              <Text style={styles.navLabel}>Workspace & Members</Text>
-              <Text style={styles.navSub}>Invite code · Member logs · Join workspace</Text>
-            </View>
-          </View>
-          <Feather name={isRTL ? "chevron-left" : "chevron-right"} size={18} color={C.textMuted} />
-        </Pressable>
       </View>
 
       {/* Language Section */}
@@ -280,9 +252,8 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#1A73E8" },
   profileInfo: { flex: 1 },
   profileName: { fontSize: 17, fontFamily: "Inter_600SemiBold", color: C.text },
-  phoneRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
-  profilePhone: { fontSize: 13, fontFamily: "Inter_400Regular", color: C.textSecondary },
-  profileIdHint: { fontSize: 11, fontFamily: "Inter_400Regular", color: C.textMuted, marginTop: 2 },
+  emailRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
+  profileEmail: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textSecondary, flex: 1 },
   editProfileBtn: {
     width: 36, height: 36, borderRadius: 10, backgroundColor: C.tintLight,
     justifyContent: "center", alignItems: "center",
@@ -313,20 +284,6 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { opacity: 0.6 },
   saveBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
-
-  navRow: {
-    backgroundColor: C.card, borderRadius: 14, padding: 14,
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    shadowColor: C.shadow, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 1, shadowRadius: 3, elevation: 1,
-  },
-  navRowRTL: { flexDirection: "row-reverse" },
-  navLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
-  navIcon: {
-    width: 38, height: 38, borderRadius: 11,
-    justifyContent: "center", alignItems: "center",
-  },
-  navLabel: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: C.text },
-  navSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: C.textMuted, marginTop: 2 },
 
   optionRow: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",

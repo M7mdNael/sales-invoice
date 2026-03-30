@@ -55,7 +55,7 @@ export default function CompaniesScreen() {
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const ownerId = user?.phone ?? "";
+    const ownerId = user?.email ?? "";
     if (mode === "edit" && editingCompany) {
       updateCompany(editingCompany.id, name.trim(), notes.trim());
     } else {
@@ -143,7 +143,7 @@ export default function CompaniesScreen() {
         keyExtractor={(c) => c.id}
         renderItem={({ item }) => {
           const count = salesInvoices.filter((inv) => inv.companyId === item.id).length;
-          const isOwner = item.ownerId === user?.phone;
+          const isOwner = item.ownerId === user?.email;
           return (
             <CompanyCard
               company={item}

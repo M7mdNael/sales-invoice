@@ -35,7 +35,7 @@ export default function CompanyDetailScreen() {
 
   const company = companies.find((c) => c.id === id);
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom + 16;
-  const isOwner = company?.ownerId === user?.phone;
+  const isOwner = company?.ownerId === user?.email;
 
   const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
@@ -43,7 +43,7 @@ export default function CompanyDetailScreen() {
     const raw = invitePhone.trim();
     const identifier = isEmail(raw) ? raw.toLowerCase() : raw.replace(/\s+/g, "");
     if (!identifier) return;
-    if (identifier === user?.phone || identifier === user?.email) {
+    if (identifier === user?.email) {
       Alert.alert("Invalid", "You cannot invite yourself.");
       return;
     }
@@ -260,7 +260,7 @@ export default function CompanyDetailScreen() {
               ) : (
                 company.members.map((member) => {
                   const memberIsEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(member);
-                  const isYou = member === user?.phone || member === user?.email;
+                  const isYou = member === user?.email;
                   const isOwnerMember = member === company.ownerId;
                   return (
                     <View key={member} style={styles.memberRow}>

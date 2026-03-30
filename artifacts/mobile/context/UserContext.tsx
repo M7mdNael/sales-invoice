@@ -10,21 +10,16 @@ import React, {
 import { getApiBase } from "@/utils/api";
 
 export interface UserProfile {
-  phone: string;
   firstName: string;
   lastName: string;
   email: string;
-  workspaceId: string;
-  inviteCode: string;
 }
 
 interface UserContextValue {
   user: UserProfile | null;
   isLoading: boolean;
-  register: (phone: string, firstName: string, lastName: string, email: string) => Promise<void>;
-  updateProfile: (phone: string, firstName: string, lastName: string, email: string) => Promise<void>;
-  joinWorkspace: (inviteCode: string) => Promise<void>;
-  refreshWorkspace: () => Promise<void>;
+  register: (firstName: string, lastName: string, email: string) => Promise<void>;
+  updateProfile: (firstName: string, lastName: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -41,7 +36,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (raw) {
         try {
           const parsed = JSON.parse(raw);
-          setUser({ email: "", workspaceId: "", inviteCode: "", ...parsed });
+          setUser({ email: "", firstName: "", lastName: "", ...parsed });
         } catch {
           setUser(null);
         }
@@ -51,7 +46,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const register = useCallback(async (
-    phone: string,
     firstName: string,
     lastName: string,
     email: string,
@@ -64,88 +58,46 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         email: emailKey,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        phone: phone.trim(),
+        phone: "",
       }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "Registration failed.");
 
     const profile: UserProfile = {
-      phone: phone.trim(),
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       email: emailKey,
-      workspaceId: data.workspaceId ?? "",
-      inviteCode: data.inviteCode ?? "",
     };
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(profile));
     setUser(profile);
   }, []);
 
   const updateProfile = useCallback(async (
-    phone: string,
     firstName: string,
     lastName: string,
-    email: string,
   ) => {
-    const emailKey = email.trim().toLowerCase();
+    if (!user?.email) return;
     try {
       await fetch(`${getApiBase()}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: emailKey,
+          email: user.email,
           firstName: firstName.trim(),
           lastName: lastName.trim(),
-          phone: phone.trim(),
+          phone: "",
         }),
       });
     } catch {}
 
     const profile: UserProfile = {
-      phone: phone.trim(),
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      email: emailKey,
-      workspaceId: user?.workspaceId ?? "",
-      inviteCode: user?.inviteCode ?? "",
+      email: user.email,
     };
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(profile));
     setUser(profile);
-  }, [user]);
-
-  const joinWorkspace = useCallback(async (inviteCode: string) => {
-    if (!user?.email) throw new Error("Not logged in.");
-    const res = await fetch(`${getApiBase()}/api/workspace/join`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: user.email, inviteCode: inviteCode.trim().toUpperCase() }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? "Failed to join workspace.");
-    const updated: UserProfile = {
-      ...user,
-      workspaceId: data.workspaceId ?? user.workspaceId,
-      inviteCode: data.inviteCode ?? user.inviteCode,
-    };
-    await AsyncStorage.setItem(USER_KEY, JSON.stringify(updated));
-    setUser(updated);
-  }, [user]);
-
-  const refreshWorkspace = useCallback(async () => {
-    if (!user?.email) return;
-    try {
-      const res = await fetch(`${getApiBase()}/api/auth/profile?email=${encodeURIComponent(user.email)}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      const updated: UserProfile = {
-        ...user,
-        workspaceId: data.workspaceId ?? user.workspaceId,
-        inviteCode: data.inviteCode ?? user.inviteCode,
-      };
-      await AsyncStorage.setItem(USER_KEY, JSON.stringify(updated));
-      setUser(updated);
-    } catch {}
   }, [user]);
 
   const logout = useCallback(async () => {
@@ -154,8 +106,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, isLoading, register, updateProfile, joinWorkspace, refreshWorkspace, logout }),
-    [user, isLoading, register, updateProfile, joinWorkspace, refreshWorkspace, logout]
+    () => ({ user, isLoading, register, updateProfile, logout }),
+    [user, isLoading, register, updateProfile, logout]
   );
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;

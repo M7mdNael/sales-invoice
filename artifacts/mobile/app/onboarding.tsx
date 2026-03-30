@@ -40,20 +40,17 @@ export default function OnboardingScreen() {
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState("");
   const [sendingCode, setSendingCode] = useState(false);
-  const [codeSent, setCodeSent] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
 
   const [code, setCode] = useState("");
   const [codeError, setCodeError] = useState("");
   const [verifying, setVerifying] = useState(false);
 
-  const [phone, setPhone] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [saving, setSaving] = useState(false);
 
   const codeRef = useRef<TextInput>(null);
-  const phoneRef = useRef<TextInput>(null);
   const firstNameRef = useRef<TextInput>(null);
   const lastNameRef = useRef<TextInput>(null);
 
@@ -89,7 +86,6 @@ export default function OnboardingScreen() {
         throw new Error("Could not reach the server. Please try again.");
       }
       if (!res.ok) throw new Error(data.error ?? "Failed to send code.");
-      setCodeSent(true);
       setResendCooldown(60);
       setStep("verify");
       setTimeout(() => codeRef.current?.focus(), 400);
@@ -126,7 +122,7 @@ export default function OnboardingScreen() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Verification failed.");
       setStep("profile");
-      setTimeout(() => phoneRef.current?.focus(), 400);
+      setTimeout(() => firstNameRef.current?.focus(), 400);
     } catch (err: any) {
       setCodeError(err?.message ?? "Incorrect code. Please try again.");
     } finally {
@@ -142,15 +138,6 @@ export default function OnboardingScreen() {
   };
 
   const handleRegister = async () => {
-    const trimmedPhone = phone.trim().replace(/\s+/g, "");
-    if (!trimmedPhone) {
-      Alert.alert("Phone Required", "Please enter your phone number.");
-      return;
-    }
-    if (trimmedPhone.length < 7) {
-      Alert.alert("Invalid Phone", "Please enter a valid phone number.");
-      return;
-    }
     if (!firstName.trim()) {
       Alert.alert("Name Required", "Please enter your first name.");
       return;
@@ -161,14 +148,9 @@ export default function OnboardingScreen() {
     }
     setSaving(true);
     try {
-      await register(trimmedPhone, firstName.trim(), lastName.trim(), email.trim().toLowerCase());
+      await register(firstName.trim(), lastName.trim(), email.trim().toLowerCase());
     } catch (err: any) {
-      const msg = err?.message ?? "Registration failed. Please try again.";
-      if (Platform.OS === "web") {
-        Alert.alert("Error", msg);
-      } else {
-        Alert.alert("Error", msg);
-      }
+      Alert.alert("Error", err?.message ?? "Registration failed. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -244,7 +226,7 @@ export default function OnboardingScreen() {
               <Text style={styles.errorText}>{emailError}</Text>
             ) : (
               <Text style={styles.hint}>
-                Used to verify your identity and receive important notifications.
+                Used to verify your identity and sync your company data.
               </Text>
             )}
 
@@ -340,28 +322,7 @@ export default function OnboardingScreen() {
 
             <Text style={styles.stepTitle}>Complete your profile</Text>
             <Text style={styles.stepDesc}>
-              Just a few more details to get started.
-            </Text>
-
-            <Text style={styles.fieldLabel}>PHONE NUMBER *</Text>
-            <View style={styles.iconRow}>
-              <View style={styles.iconBox}>
-                <Text style={styles.iconEmoji}>📱</Text>
-              </View>
-              <TextInput
-                ref={phoneRef}
-                style={styles.iconInput}
-                placeholder="e.g. 0787257541"
-                placeholderTextColor={C.textMuted}
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                returnKeyType="next"
-                onSubmitEditing={() => firstNameRef.current?.focus()}
-              />
-            </View>
-            <Text style={[styles.hint, { marginBottom: 16 }]}>
-              Your phone number is your unique ID — others use it to invite you to their company.
+              Enter your name so your colleagues know who created each invoice.
             </Text>
 
             <Text style={styles.fieldLabel}>FIRST NAME *</Text>
@@ -408,7 +369,7 @@ export default function OnboardingScreen() {
         <View style={styles.noteCard}>
           <Feather name="cloud" size={14} color={C.textMuted} />
           <Text style={styles.noteText}>
-            Your data is securely synced to the cloud. Share invoices with a colleague using a workspace invite code.
+            Your data is securely synced to the cloud. All devices logged in with the same email share the same data.
           </Text>
         </View>
       </ScrollView>
@@ -461,7 +422,6 @@ const styles = StyleSheet.create({
     width: 44, height: 50, justifyContent: "center", alignItems: "center",
     borderRightWidth: 1, borderRightColor: C.border,
   },
-  iconEmoji: { fontSize: 20 },
   iconInput: {
     flex: 1, fontSize: 16, fontFamily: "Inter_400Regular", color: C.text,
     paddingHorizontal: 14, height: 50,
