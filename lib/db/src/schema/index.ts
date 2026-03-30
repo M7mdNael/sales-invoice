@@ -52,7 +52,29 @@ export const returnsTable = pgTable("returns", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const companiesTable = pgTable("companies", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id").notNull(),
+  name: text("name").notNull(),
+  notes: text("notes").notNull().default(""),
+  ownerEmail: text("owner_email").notNull().default(""),
+  membersJson: text("members_json").notNull().default("[]"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const productsTable = pgTable("products", {
+  id: text("id").primaryKey(),
+  workspaceId: text("workspace_id").notNull(),
+  name: text("name").notNull(),
+  price: real("price").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export type User = typeof usersTable.$inferSelect;
 export type Workspace = typeof workspacesTable.$inferSelect;
 export type Invoice = typeof invoicesTable.$inferSelect;
 export type Return = typeof returnsTable.$inferSelect;
+export type CompanyRow = typeof companiesTable.$inferSelect;
+export type ProductRow = typeof productsTable.$inferSelect;

@@ -203,20 +203,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     isFetchingRef.current = true;
     setIsSyncing(true);
     try {
-      const [invRes, retRes, trashInvRes, trashRetRes] = await Promise.all([
-        fetch(`${getApiBase()}/api/invoices?email=${encodeURIComponent(user.email)}`),
-        fetch(`${getApiBase()}/api/returns?email=${encodeURIComponent(user.email)}`),
-        fetch(`${getApiBase()}/api/invoices?email=${encodeURIComponent(user.email)}&deleted=true`),
-        fetch(`${getApiBase()}/api/returns?email=${encodeURIComponent(user.email)}&deleted=true`),
+      const emailParam = encodeURIComponent(user.email);
+      const [invRes, retRes, trashInvRes, trashRetRes, compRes, prodRes] = await Promise.all([
+        fetch(`${getApiBase()}/api/invoices?email=${emailParam}`),
+        fetch(`${getApiBase()}/api/returns?email=${emailParam}`),
+        fetch(`${getApiBase()}/api/invoices?email=${emailParam}&deleted=true`),
+        fetch(`${getApiBase()}/api/returns?email=${emailParam}&deleted=true`),
+        fetch(`${getApiBase()}/api/companies?email=${emailParam}`),
+        fetch(`${getApiBase()}/api/products?email=${emailParam}`),
       ]);
-      const [invData, retData, trashInvData, trashRetData] = await Promise.all([
+      const [invData, retData, trashInvData, trashRetData, compData, prodData] = await Promise.all([
         invRes.json(), retRes.json(), trashInvRes.json(), trashRetRes.json(),
+        compRes.json(), prodRes.json(),
       ]);
 
       if (invData.invoices) setSalesInvoices(invData.invoices.map(migrateSalesInvoice));
       if (retData.returns) setReturnInvoices(retData.returns.map(migrateReturnInvoice));
       if (trashInvData.invoices) setTrashedInvoices(trashInvData.invoices.map(migrateSalesInvoice));
       if (trashRetData.returns) setTrashedReturns(trashRetData.returns.map(migrateReturnInvoice));
+
+      if (compData.companies) {
+        const serverCompanies: Company[] = compData.companies.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          notes: c.notes ?? "",
+          ownerId: c.ownerEmail ?? "",
+          members: c.members ?? [],
+        }));
+        setCompanies(serverCompanies);
+        AsyncStorage.setItem(STORAGE_KEYS.companies, JSON.stringify(serverCompanies));
+      }
+
+      if (prodData.products) {
+        const serverProducts: Product[] = prodData.products.map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          price: p.price,
+        }));
+        setProducts(serverProducts);
+        AsyncStorage.setItem(STORAGE_KEYS.products, JSON.stringify(serverProducts));
+      }
 
       const allInvNums = [...(invData.invoices ?? []), ...(trashInvData.invoices ?? [])]
         .map((inv: any) => {
@@ -316,6 +342,41 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(STORAGE_KEYS.products, JSON.stringify(data));
   }, []);
 
+  const pushCompanyToServer = useCallback((company: Company) => {
+    if (!user?.email) return;
+    fetch(`${getApiBase()}/api/companies`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: user.email, company: {
+        id: company.id, name: company.name, notes: company.notes,
+        ownerEmail: company.ownerId, members: company.members,
+      }}),
+    }).catch((e) => console.warn("pushCompanyToServer error:", e));
+  }, [user?.email]);
+
+  const deleteCompanyFromServer = useCallback((id: string) => {
+    if (!user?.email) return;
+    fetch(`${getApiBase()}/api/companies/${id}?email=${encodeURIComponent(user.email)}`, {
+      method: "DELETE",
+    }).catch((e) => console.warn("deleteCompanyFromServer error:", e));
+  }, [user?.email]);
+
+  const pushProductToServer = useCallback((product: Product) => {
+    if (!user?.email) return;
+    fetch(`${getApiBase()}/api/products`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: user.email, product }),
+    }).catch((e) => console.warn("pushProductToServer error:", e));
+  }, [user?.email]);
+
+  const deleteProductFromServer = useCallback((id: string) => {
+    if (!user?.email) return;
+    fetch(`${getApiBase()}/api/products/${id}?email=${encodeURIComponent(user.email)}`, {
+      method: "DELETE",
+    }).catch((e) => console.warn("deleteProductFromServer error:", e));
+  }, [user?.email]);
+
   const addCompany = useCallback(
     (name: string, notes: string, ownerId: string): Company => {
       const company: Company = {
@@ -328,9 +389,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const updated = [...companies, company];
       setCompanies(updated);
       saveCompanies(updated);
+      pushCompanyToServer(company);
       return company;
     },
-    [companies, saveCompanies]
+    [companies, saveCompanies, pushCompanyToServer]
   );
 
   const inviteMember = useCallback(
@@ -344,9 +406,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       setCompanies(updated);
       saveCompanies(updated);
+      const changed = updated.find((c) => c.id === companyId);
+      if (changed) pushCompanyToServer(changed);
       return true;
     },
-    [companies, saveCompanies]
+    [companies, saveCompanies, pushCompanyToServer]
   );
 
   const removeMember = useCallback(
@@ -357,8 +421,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       setCompanies(updated);
       saveCompanies(updated);
+      const changed = updated.find((c) => c.id === companyId);
+      if (changed) pushCompanyToServer(changed);
     },
-    [companies, saveCompanies]
+    [companies, saveCompanies, pushCompanyToServer]
   );
 
   const updateCompany = useCallback(
@@ -368,8 +434,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       );
       setCompanies(updated);
       saveCompanies(updated);
+      const changed = updated.find((c) => c.id === id);
+      if (changed) pushCompanyToServer(changed);
     },
-    [companies, saveCompanies]
+    [companies, saveCompanies, pushCompanyToServer]
   );
 
   const deleteCompany = useCallback(
@@ -377,8 +445,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const updated = companies.filter((c) => c.id !== id);
       setCompanies(updated);
       saveCompanies(updated);
+      deleteCompanyFromServer(id);
     },
-    [companies, saveCompanies]
+    [companies, saveCompanies, deleteCompanyFromServer]
   );
 
   const addProduct = useCallback(
@@ -387,8 +456,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const updated = [...products, product];
       setProducts(updated);
       saveProducts(updated);
+      pushProductToServer(product);
     },
-    [products, saveProducts]
+    [products, saveProducts, pushProductToServer]
   );
 
   const updateProduct = useCallback(
@@ -398,8 +468,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       );
       setProducts(updated);
       saveProducts(updated);
+      const changed = updated.find((p) => p.id === id);
+      if (changed) pushProductToServer(changed);
     },
-    [products, saveProducts]
+    [products, saveProducts, pushProductToServer]
   );
 
   const deleteProduct = useCallback(
@@ -407,8 +479,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const updated = products.filter((p) => p.id !== id);
       setProducts(updated);
       saveProducts(updated);
+      deleteProductFromServer(id);
     },
-    [products, saveProducts]
+    [products, saveProducts, deleteProductFromServer]
   );
 
   const getNextInvoiceNumber = useCallback(() => {
