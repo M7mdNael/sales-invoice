@@ -1,7 +1,7 @@
 export function getApiBase(): string {
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
   if (domain) return `https://${domain}`;
-  return "http://localhost:80";
+  return "https://942ccd4c-7cec-4401-9f18-3c2f4f27e8da-00-21p7gpcxv9k13.pike.replit.dev";
 }
 
 export async function apiGet<T>(path: string): Promise<T> {
