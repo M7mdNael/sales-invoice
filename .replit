@@ -54,3 +54,8 @@ channel = "stable-25_05"
 
 [userenv.shared]
 GMAIL_FROM_ADDRESS = "salesinvoiceapp@gmail.com"
+
+[[ports]]
+localPort = 8080
+externalPort = 80
+
