@@ -20,7 +20,7 @@ import { UserProvider, useUser } from "@/context/UserContext";
 import OnboardingScreen from "./onboarding";
 import { setBaseUrl } from "@workspace/api-client-react";
 
-setBaseUrl("https://942ccd4c-7cec-4401-9f18-3c2f4f27e8da-00-21p7gpcxv9k13.pike.replit.dev");
+setBaseUrl("https://sales-invoice-ns6p.onrender.com");
 
 SplashScreen.preventAutoHideAsync();
 

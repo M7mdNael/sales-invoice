@@ -26,7 +26,7 @@ function isValidEmail(email: string) {
 function getApiBase() {
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
   if (domain) return `https://${domain}`;
-  return "https://942ccd4c-7cec-4401-9f18-3c2f4f27e8da-00-21p7gpcxv9k13.pike.replit.dev";
+  return "https://sales-invoice-ns6p.onrender.com";
 }
 
 type Step = "email" | "verify" | "profile";
