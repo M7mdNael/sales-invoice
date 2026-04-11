@@ -31,7 +31,15 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "./plugins/trust-local-certs"
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "networkInspector": true,
+            "usesCleartextTraffic": false
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
