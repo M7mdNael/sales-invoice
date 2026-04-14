@@ -24,7 +24,7 @@ router.post("/verify/send", async (req, res) => {
         "api-key": process.env.BREVO_API_KEY!,
       },
       body: JSON.stringify({
-        sender: { name: "Sales Manager", email: "a8218d001@smtp-brevo.com" },
+        sender: { name: "Sales Manager", email: "salesinvoiceapp@gmail.com" },
         to: [{ email: email.trim() }],
         subject: "Your Sales Manager verification code",
         htmlContent: `
