@@ -1,19 +1,14 @@
 import { Router } from "express";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 const router = Router();
 
 const otpStore = new Map<string, { code: string; expiresAt: number }>();
 
-function getTransporter() {
-  const pass = process.env.GMAIL_APP_PASSWORD;
-  const user = process.env.GMAIL_FROM_ADDRESS;
-  if (!pass) throw new Error("GMAIL_APP_PASSWORD secret is not set.");
-  if (!user) throw new Error("GMAIL_FROM_ADDRESS secret is not set.");
-  return nodemailer.createTransport({
-    service: "gmail",
-    auth: { user, pass },
-  });
+function getResend() {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error("RESEND_API_KEY secret is not set.");
+  return new Resend(apiKey);
 }
 
 router.post("/verify/send", async (req, res) => {
@@ -30,9 +25,9 @@ router.post("/verify/send", async (req, res) => {
       expiresAt: Date.now() + 10 * 60 * 1000,
     });
 
-    const transporter = getTransporter();
-    await transporter.sendMail({
-      from: `"Sales Manager" <${process.env.GMAIL_FROM_ADDRESS}>`,
+    const resend = getResend();
+    await resend.emails.send({
+      from: "Sales Manager <onboarding@resend.dev>",
       to: email.trim(),
       subject: "Your Sales Manager verification code",
       html: `
