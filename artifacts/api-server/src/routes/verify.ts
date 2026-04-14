@@ -1,20 +1,7 @@
 import { Router } from "express";
-import nodemailer from "nodemailer";
 
 const router = Router();
-
 const otpStore = new Map<string, { code: string; expiresAt: number }>();
-
-function getTransporter() {
-  const pass = process.env.GMAIL_APP_PASSWORD;
-  const user = process.env.GMAIL_FROM_ADDRESS;
-  if (!pass) throw new Error("GMAIL_APP_PASSWORD secret is not set.");
-  if (!user) throw new Error("GMAIL_FROM_ADDRESS secret is not set.");
-  return nodemailer.createTransport({
-    service: "gmail",
-    auth: { user, pass },
-  });
-}
 
 router.post("/verify/send", async (req, res) => {
   try {
@@ -30,24 +17,35 @@ router.post("/verify/send", async (req, res) => {
       expiresAt: Date.now() + 10 * 60 * 1000,
     });
 
-    const transporter = getTransporter();
-    await transporter.sendMail({
-      from: `"Sales Manager" <${process.env.GMAIL_FROM_ADDRESS}>`,
-      to: email.trim(),
-      subject: "Your Sales Manager verification code",
-      html: `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
-          <h2 style="color:#1A73E8;margin-bottom:8px">Sales Manager</h2>
-          <p style="color:#374151;margin-bottom:24px">Here is your verification code:</p>
-          <div style="background:#F3F4F6;border-radius:12px;padding:24px;text-align:center">
-            <span style="font-size:40px;font-weight:700;letter-spacing:10px;color:#111827">${code}</span>
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": process.env.BREVO_API_KEY!,
+      },
+      body: JSON.stringify({
+        sender: { name: "Sales Manager", email: "a8218d001@smtp-brevo.com" },
+        to: [{ email: email.trim() }],
+        subject: "Your Sales Manager verification code",
+        htmlContent: `
+          <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+            <h2 style="color:#1A73E8;margin-bottom:8px">Sales Manager</h2>
+            <p style="color:#374151;margin-bottom:24px">Here is your verification code:</p>
+            <div style="background:#F3F4F6;border-radius:12px;padding:24px;text-align:center">
+              <span style="font-size:40px;font-weight:700;letter-spacing:10px;color:#111827">${code}</span>
+            </div>
+            <p style="color:#6B7280;font-size:13px;margin-top:20px">
+              This code expires in 10 minutes. If you did not request this, you can ignore this email.
+            </p>
           </div>
-          <p style="color:#6B7280;font-size:13px;margin-top:20px">
-            This code expires in 10 minutes. If you did not request this, you can ignore this email.
-          </p>
-        </div>
-      `,
+        `,
+      }),
     });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(JSON.stringify(err));
+    }
 
     res.json({ success: true });
   } catch (err: any) {
